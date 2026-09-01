@@ -1,0 +1,27 @@
+# Terraform / OCI
+*.tfvars
+!*.tfvars.example
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.env.*
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# DB / local data
+*.db
+data/
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
