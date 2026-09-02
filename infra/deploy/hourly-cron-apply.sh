@@ -9,6 +9,7 @@ LOG="${HOME}/Library/Logs/event-oci-hourly-retry.log"
 MARKER="event-oci-hourly-retry"
 
 mkdir -p "$(dirname "$LOG")"
+: >"$LOG"
 
 log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG"

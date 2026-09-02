@@ -87,13 +87,17 @@ docker run --rm \
 在庫不足（`Out of host capacity`）時:
 
 ```bash
-# 手動リトライ
+# 手動リトライ（1 回）
 bash infra/deploy/retry-apply.sh
 
-# または Mac cron（1 時間ごと）
-# crontab -e
-# 0 * * * * /path/to/event-app/infra/deploy/hourly-cron-apply.sh # event-oci-hourly-retry
+# Mac cron（1 時間ごと・既存 event-oci エントリは上書き）
+bash infra/deploy/setup-cron.sh
+
+# cron 解除
+bash infra/deploy/remove-cron.sh
 ```
+
+ログは **実行のたびに上書き**（`~/Library/Logs/event-oci-hourly-retry.log`）。過去 run の蓄積はしない。
 
 ## Step 3: 確認
 
