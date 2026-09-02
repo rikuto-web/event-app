@@ -2,13 +2,17 @@
 # Mac 上で event-oci-hourly-retry cron を登録（既存エントリは上書き）。
 set -euo pipefail
 
-SCRIPT="$(cd "$(dirname "$0")" && pwd)/hourly-cron-apply.sh"
+DEPLOY_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$DEPLOY_DIR/../.." && pwd)"
+SCRIPT="$DEPLOY_DIR/hourly-cron-apply.sh"
 MARKER="event-oci-hourly-retry"
-CRON_LINE="0 * * * * EVENT_APP_ROOT=\"$(cd "$SCRIPT/../.." && pwd)\" $SCRIPT # $MARKER"
+CRON_LINE="0 * * * * EVENT_APP_ROOT=\"$ROOT\" $SCRIPT # $MARKER"
 
 TMP="$(mktemp)"
-(crontab -l 2>/dev/null | grep -v "$MARKER" || true) >"$TMP"
-echo "$CRON_LINE" >>"$TMP"
+{
+  crontab -l 2>/dev/null | grep -v "$MARKER" | grep -v "hourly-cron-apply.sh" || true
+  echo "$CRON_LINE"
+} | awk '!seen[$0]++' >"$TMP"
 crontab "$TMP"
 rm -f "$TMP"
 

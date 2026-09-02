@@ -52,7 +52,7 @@ resource "oci_core_network_security_group_security_rule" "api_from_fe" {
   network_security_group_id = oci_core_network_security_group.api.id
   direction                 = "INGRESS"
   protocol                  = "6"
-  source                    = "${module.fe_vm.private_ip}/32"
+  source                    = var.subnet_cidr
   source_type               = "CIDR_BLOCK"
 
   tcp_options {

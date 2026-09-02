@@ -47,9 +47,6 @@ output "object_storage_namespace" {
 }
 
 output "ocir_repositories" {
-  value = [
-    oci_artifacts_container_repository.frontend.display_name,
-    oci_artifacts_container_repository.api.display_name,
-    oci_artifacts_container_repository.nginx.display_name,
-  ]
+  description = "Create manually at deploy time (OCIR Terraform API returns 403 on Free Tier)."
+  value       = ["event-frontend", "event-api", "event-nginx"]
 }

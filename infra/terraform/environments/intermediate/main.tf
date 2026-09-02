@@ -29,9 +29,7 @@ data "oci_core_images" "oracle_linux" {
   sort_order               = "DESC"
 }
 
-data "oci_objectstorage_namespace" "ns" {
-  compartment_id = local.compartment_id
-}
+data "oci_objectstorage_namespace" "ns" {}
 
 module "vcn" {
   source = "../../modules/vcn"
@@ -94,20 +92,4 @@ module "object_storage" {
   namespace      = data.oci_objectstorage_namespace.ns.namespace
 }
 
-resource "oci_artifacts_container_repository" "frontend" {
-  compartment_id = local.compartment_id
-  display_name   = "event-frontend"
-  is_public      = false
-}
-
-resource "oci_artifacts_container_repository" "api" {
-  compartment_id = local.compartment_id
-  display_name   = "event-api"
-  is_public      = false
-}
-
-resource "oci_artifacts_container_repository" "nginx" {
-  compartment_id = local.compartment_id
-  display_name   = "event-nginx"
-  is_public      = false
-}
+# OCIR は Terraform API が Free Tier で 403 になるため、デプロイ時に Console / CLI で手動作成。

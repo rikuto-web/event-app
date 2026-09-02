@@ -14,7 +14,7 @@
 | api-vm | Ampere A1 Flex 1 OCPU / 3 GB |
 | Load Balancer | Flexible LB、HTTP :80（HTTPS はデプロイ時） |
 | Object Storage | `event-app-images-prod` |
-| OCIR | `event-frontend`, `event-api`, `event-nginx` |
+| OCIR | `event-frontend`, `event-api`, `event-nginx`（**Console 手動**。Terraform API は Free Tier で 403） |
 
 ## デプロイ時に調整するもの（後回しで OK）
 
