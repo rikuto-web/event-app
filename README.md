@@ -14,6 +14,7 @@
 | [05 データモデル](docs/05-data-model.md) | ER 図、テーブル定義、DDL |
 | [06 API](docs/06-api.md) | REST / WebSocket、認証、エラー |
 | [07 アーキテクチャ](docs/07-architecture.md) | アプリ構成 + OCI インフラ（LB、Docker、OCIR、cron、Terraform） |
+| [08 開発ガイド](docs/08-development-guide.md) | 垂直スライス、TDD、テスト戦略 |
 
 > プロトタイプ（`prototype/`）で確定した UI 仕様は [01 機能要件 §6](docs/01-functional-requirements.md#6-検索フィルタイベント一覧)・[04 画面遷移](docs/04-screen-transitions.md) に反映済み。
 
