@@ -85,8 +85,46 @@ flowchart TB
 
 ## 現状
 
-- **設計ドキュメント**（`docs/01`〜`07`）— 本番実装・Terraform apply は未着手
+- **VS-00 Walking Skeleton** — `backend/` + `frontend/` 骨格、health API、Alembic 初回マイグレーション、AppShell
+- **設計ドキュメント**（`docs/01`〜`08`）
 - **HTML/CSS/JS プロトタイプ**（`prototype/`）— UX 検証用。Docs と矛盾する場合は **プロトタイプを正** とする（一覧 UI・作成モーダル等）
+
+## ローカル開発（VS-00）
+
+### 前提
+
+- Python 3.12+
+- Node.js 20+
+- PostgreSQL 16（例: `docker run -d --name event-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=event_app -p 5433:5432 postgres:16`）
+
+### バックエンド
+
+```bash
+cd backend
+python3 -m pip install -e ".[dev]"
+cp .env.example .env
+alembic upgrade head
+python3 -m granian --interface asgi app.main:app --host 0.0.0.0 --port 8080
+```
+
+### フロントエンド
+
+```bash
+cd frontend
+npm install
+cp .env.example .env
+npm run dev
+```
+
+- FE: http://localhost:5173
+- API health: http://localhost:8080/api/v1/health
+
+### テスト
+
+```bash
+cd backend && python3 -m pytest
+cd frontend && npm test
+```
 
 ### プロトタイプの起動
 
