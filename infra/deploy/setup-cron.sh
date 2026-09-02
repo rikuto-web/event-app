@@ -6,7 +6,7 @@ DEPLOY_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$DEPLOY_DIR/../.." && pwd)"
 SCRIPT="$DEPLOY_DIR/hourly-cron-apply.sh"
 MARKER="event-oci-hourly-retry"
-CRON_LINE="0 * * * * EVENT_APP_ROOT=\"$ROOT\" $SCRIPT # $MARKER"
+CRON_LINE="*/5 * * * * PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin EVENT_APP_ROOT=\"$ROOT\" $SCRIPT # $MARKER"
 
 TMP="$(mktemp)"
 {

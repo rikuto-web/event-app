@@ -62,26 +62,13 @@ cp ../../../../../recipe-app/infra/terraform/environments/beginner/terraform.tfv
 
 ## Step 2: terraform apply
 
+Mac では **terraform CLI のみ**（Docker 不要）。未インストール時: `brew install hashicorp/tap/terraform`
+
 ```bash
 cd infra/terraform/environments/intermediate
-
-docker run --rm \
-  -v "$PWD/..:/workspace" \
-  -v "$HOME/.oci:/root/.oci:ro" \
-  -w /workspace/environments/intermediate \
-  hashicorp/terraform:1.9 init
-
-docker run --rm \
-  -v "$PWD/..:/workspace" \
-  -v "$HOME/.oci:/root/.oci:ro" \
-  -w /workspace/environments/intermediate \
-  hashicorp/terraform:1.9 plan
-
-docker run --rm \
-  -v "$PWD/..:/workspace" \
-  -v "$HOME/.oci:/root/.oci:ro" \
-  -w /workspace/environments/intermediate \
-  hashicorp/terraform:1.9 apply
+terraform init
+terraform plan
+terraform apply
 ```
 
 在庫不足（`Out of host capacity`）時:
@@ -90,7 +77,7 @@ docker run --rm \
 # 手動リトライ（1 回）
 bash infra/deploy/retry-apply.sh
 
-# Mac cron（1 時間ごと・既存 event-oci エントリは上書き）
+# Mac cron（5 分ごと・既存 event-oci エントリは上書き）
 bash infra/deploy/setup-cron.sh
 
 # cron 解除
