@@ -126,6 +126,11 @@ cd backend && python3 -m pytest
 cd frontend && npm test
 ```
 
+## OCI インフラ先行取得
+
+Ampere VM / LB 等の在庫確保のため、アプリ完成前に Terraform でリソースを取得できます。  
+手順は [infra/README.md](infra/README.md) を参照（recipe-app の `terraform.tfvars` を流用可）。
+
 ### プロトタイプの起動
 
 ```bash

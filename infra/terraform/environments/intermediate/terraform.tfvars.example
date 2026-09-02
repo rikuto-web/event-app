@@ -1,0 +1,32 @@
+# Copy from recipe-app and adjust:
+#   cp ../../../../../recipe-app/infra/terraform/environments/beginner/terraform.tfvars ./terraform.tfvars
+# terraform.tfvars is gitignored.
+
+tenancy_ocid     = "ocid1.tenancy.oc1..xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+user_ocid        = "ocid1.user.oc1..xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+fingerprint      = "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99"
+private_key_path = "~/.oci/oci_api_key.pem"
+
+home_region = "ap-osaka-1"
+region      = "ap-osaka-1"
+
+# Optional: reuse an existing compartment instead of creating event-event-app.
+# compartment_ocid = "ocid1.compartment.oc1..xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+project_prefix = "event"
+
+# Avoid CIDR collision with destroyed recipe-app (10.0.0.0/16).
+vcn_cidr    = "10.1.0.0/16"
+subnet_cidr = "10.1.0.0/24"
+dns_label   = "eventint"
+
+# Ampere A1 Flex — required for 2 VM layout (2 OCPU / 6 GB total).
+compute_shape = "VM.Standard.A1.Flex"
+
+admin_cidr     = "203.0.113.10/32"
+ssh_public_key = "ssh-ed25519 AAAA...you@example.com"
+
+# fe_ocpus         = 1
+# fe_memory_in_gbs = 3
+# api_ocpus        = 1
+# api_memory_in_gbs = 3
