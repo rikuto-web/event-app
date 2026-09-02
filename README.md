@@ -15,6 +15,8 @@
 | [06 API](docs/06-api.md) | REST / WebSocket、認証、エラー |
 | [07 アーキテクチャ](docs/07-architecture.md) | アプリ構成 + OCI インフラ（LB、Docker、OCIR、cron、Terraform） |
 
+> プロトタイプ（`prototype/`）で確定した UI 仕様は [01 機能要件 §6](docs/01-functional-requirements.md#6-検索フィルタイベント一覧)・[04 画面遷移](docs/04-screen-transitions.md) に反映済み。
+
 ## 技術スタック
 
 | 層 | 採用 | 役割 |
@@ -82,7 +84,18 @@ flowchart TB
 
 ## 現状
 
-**設計ドキュメントのみ**（実装・Terraform apply は未着手）。
+- **設計ドキュメント**（`docs/01`〜`07`）— 本番実装・Terraform apply は未着手
+- **HTML/CSS/JS プロトタイプ**（`prototype/`）— UX 検証用。Docs と矛盾する場合は **プロトタイプを正** とする（一覧 UI・作成モーダル等）
+
+### プロトタイプの起動
+
+```bash
+cd prototype
+python3 -m http.server 8765
+# http://localhost:8765 を開く
+```
+
+デモアカウント: `alice@example.com` / `demo1234`
 
 ## 初級（recipe-app）との関係
 

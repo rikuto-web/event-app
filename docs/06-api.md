@@ -113,7 +113,20 @@
 }
 ```
 
-### GET `/events?q=勉強会&sort=starts_at_asc`
+### GET `/events` — クエリパラメータ
+
+| パラメータ | 型 | 説明 |
+| --- | --- | --- |
+| role | string | `owner` / `member`（省略時はすべて） |
+| from | date | 期間フィルタ開始（`YYYY-MM-DD`）。イベントの `[starts_at, ends_at)` が `[from 00:00, to+1 00:00)` と **重なる**もの |
+| to | date | 期間フィルタ終了（`YYYY-MM-DD`）。`from` 省略時は単日扱い |
+| sort | string | `starts_at_asc`（既定）/ `starts_at_desc` / `updated_desc` |
+
+**採用しない**: `q`（キーワード検索）。
+
+`view` / `month` / `create` はフロントの hash ルーティング専用。API には送らない。
+
+### GET `/events?role=owner&sort=starts_at_asc`
 
 **Response 200**
 
