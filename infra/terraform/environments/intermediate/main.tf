@@ -42,6 +42,7 @@ module "vcn" {
 }
 
 module "fe_vm" {
+  count  = var.enable_fe_vm ? 1 : 0
   source = "../../modules/compute"
 
   compartment_id      = local.compartment_id
@@ -79,7 +80,8 @@ module "load_balancer" {
   compartment_id      = local.compartment_id
   display_name_prefix = var.project_prefix
   subnet_id           = module.vcn.subnet_id
-  backend_ip          = module.fe_vm.private_ip
+  create_backend      = var.enable_fe_vm
+  backend_ip          = var.enable_fe_vm ? module.fe_vm[0].private_ip : ""
   backend_port        = 80
   listener_port       = 80
 }

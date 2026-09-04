@@ -10,9 +10,16 @@ variable "subnet_id" {
   type = string
 }
 
+variable "create_backend" {
+  description = "Attach fe-vm to the backend set. Disable during api-vm-only phase."
+  type        = bool
+  default     = true
+}
+
 variable "backend_ip" {
   description = "Private IP of the fe-vm backend."
   type        = string
+  default     = ""
 }
 
 variable "backend_port" {

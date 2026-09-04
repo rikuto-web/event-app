@@ -26,6 +26,8 @@ resource "oci_load_balancer_backend_set" "fe" {
 }
 
 resource "oci_load_balancer_backend" "fe" {
+  count = var.create_backend ? 1 : 0
+
   load_balancer_id = oci_load_balancer_load_balancer.this.id
   backendset_name  = oci_load_balancer_backend_set.fe.name
   ip_address       = var.backend_ip

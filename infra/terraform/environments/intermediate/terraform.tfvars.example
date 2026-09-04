@@ -30,3 +30,7 @@ ssh_public_key = "ssh-ed25519 AAAA...you@example.com"
 # fe_memory_in_gbs = 3
 # api_ocpus        = 1
 # api_memory_in_gbs = 3
+
+# Phase 1 (default): api-vm only. Phase 2: set true after api-vm exists.
+# Cron / retry-apply.sh flip this automatically; manual apply usually needs no change.
+# enable_fe_vm = false

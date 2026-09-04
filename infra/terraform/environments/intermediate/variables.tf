@@ -90,3 +90,9 @@ variable "images_bucket_name" {
   type    = string
   default = "event-app-images-prod"
 }
+
+variable "enable_fe_vm" {
+  description = "Create fe-vm and attach it to the load balancer. false = api-vm only (phase 1)."
+  type        = bool
+  default     = false
+}

@@ -10,11 +10,21 @@
 | リソース | 内容 |
 | --- | --- |
 | Compartment | `event-event-app` |
-| fe-vm | Ampere A1 Flex 1 OCPU / 3 GB |
-| api-vm | Ampere A1 Flex 1 OCPU / 3 GB |
+| api-vm | Ampere A1 Flex 1 OCPU / 3 GB（**Phase 1: 先に取得**） |
+| fe-vm | Ampere A1 Flex 1 OCPU / 3 GB（**Phase 2: api-vm 取得後**） |
 | Load Balancer | Flexible LB、HTTP :80（HTTPS はデプロイ時） |
 | Object Storage | `event-app-images-prod` |
 | OCIR | `event-frontend`, `event-api`, `event-nginx`（**Console 手動**。Terraform API は Free Tier で 403） |
+
+### VM の段階取得（在庫不足対策）
+
+Ampere A1 は在庫が少なく、2 台同時作成は `Out of host capacity` になりやすいです。  
+**api-vm → fe-vm の順で 1 台ずつ** apply します（cron / retry スクリプトが自動で段階を切り替え）。
+
+| Phase | 内容 | `enable_fe_vm` |
+| --- | --- | --- |
+| 1 | api-vm のみ | `false`（デフォルト） |
+| 2 | fe-vm + LB backend | `true`（api-vm が state にあるとき自動） |
 
 ## デプロイ時に調整するもの（後回しで OK）
 
@@ -74,10 +84,10 @@ terraform apply
 在庫不足（`Out of host capacity`）時:
 
 ```bash
-# 手動リトライ（1 回）
+# 手動リトライ（段階的: api-vm → fe-vm）
 bash infra/deploy/retry-apply.sh
 
-# Mac cron（5 分ごと・既存 event-oci エントリは上書き）
+# Mac cron（5 分ごと・段階を自動切替・既存 event-oci エントリは上書き）
 bash infra/deploy/setup-cron.sh
 
 # cron 解除
