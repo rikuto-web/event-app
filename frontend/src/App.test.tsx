@@ -52,4 +52,39 @@ describe("App", () => {
     expect(await screen.findByText("Alice")).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "カレンダー" })).toBeInTheDocument();
   });
+
+  it("redirects /events/new to create modal", async () => {
+    setTokens({
+      access_token: "access-token",
+      token_type: "bearer",
+      expires_in: 900,
+      refresh_token: "refresh-token",
+    });
+
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/users/me")) {
+        return new Response(
+          JSON.stringify({
+            id: "user-1",
+            email: "alice@example.com",
+            display_name: "Alice",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (url.includes("/events")) {
+        return new Response(JSON.stringify({ items: [], total: 0 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(null, { status: 404 });
+    });
+
+    window.history.pushState({}, "", "/events/new");
+    render(() => <App />);
+
+    expect(await screen.findByRole("heading", { name: "新規イベント" })).toBeInTheDocument();
+  });
 });

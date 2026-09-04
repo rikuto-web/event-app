@@ -76,6 +76,10 @@ const App: Component = () => {
     <Router root={Root}>
       <Route path="/" component={() => <Navigate href="/events" />} />
       <Route
+        path="/events/new"
+        component={() => <Navigate href="/events?create=1" />}
+      />
+      <Route
         path="/events/:eventId"
         component={() => (
           <RequireAuth>

@@ -1,10 +1,19 @@
 import { createResource, createSignal, Show, type Component } from "solid-js";
 import { useNavigate, useSearchParams } from "@solidjs/router";
 import { CalendarView } from "../components/events/CalendarView";
+import { CreateEventModal } from "../components/events/CreateEventModal";
 import { DayEventsModal } from "../components/events/DayEventsModal";
 import { EventToolbar } from "../components/events/EventToolbar";
 import { ScheduleView } from "../components/events/ScheduleView";
-import { buildListQuery, getScheduleRange, getViewMode, monthKey } from "../lib/event-dates";
+import {
+  buildListQuery,
+  defaultRangeForDay,
+  defaultRangeFromNow,
+  getCalendarMonth,
+  getScheduleRange,
+  getViewMode,
+  monthKey,
+} from "../lib/event-dates";
 import { fetchEvents, type EventListItem } from "../lib/events";
 
 type DayModalState = {
@@ -51,6 +60,30 @@ export const EventsPage: Component = () => {
   const navigateWithQuery = (query: Record<string, string | undefined>) => {
     navigate(`/events${buildListQuery(query)}`);
   };
+
+  const closeCreateModal = () => {
+    const params = parsedParams();
+    navigateWithQuery({
+      view: params.get("view") ?? undefined,
+      month: params.get("month") ?? undefined,
+      from: params.get("from") ?? undefined,
+      to: params.get("to") ?? undefined,
+      role: params.get("role") ?? undefined,
+    });
+  };
+
+  const createDefaults = () => {
+    const params = parsedParams();
+    const dayParam = params.get("day");
+    if (dayParam) {
+      const day = Number(dayParam);
+      const { year, month } = getCalendarMonth(params);
+      return defaultRangeForDay(year, month, day);
+    }
+    return defaultRangeFromNow();
+  };
+
+  const isCreateOpen = () => parsedParams().get("create") === "1";
 
   const openCreateForDay = (year: number, month: number, day: number) => {
     const monthParam = monthKey(year, month);
@@ -141,6 +174,14 @@ export const EventsPage: Component = () => {
             }}
           />
         )}
+      </Show>
+
+      <Show when={isCreateOpen()}>
+        <CreateEventModal
+          defaults={createDefaults()}
+          onClose={closeCreateModal}
+          onCreated={(eventId) => navigate(`/events/${eventId}`)}
+        />
       </Show>
     </section>
   );

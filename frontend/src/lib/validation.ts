@@ -45,6 +45,34 @@ export function validateDisplayName(value: string): string | null {
   return null;
 }
 
+export function validateEventTitle(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "必須です";
+  }
+  if (trimmed.length > 100) {
+    return "100文字以内で入力";
+  }
+  return null;
+}
+
+export function validateDatetimeRequired(value: string): string | null {
+  if (!value) {
+    return "必須です";
+  }
+  return null;
+}
+
+export function validateEventDatetimeRange(startsAt: string, endsAt: string): string | null {
+  if (!startsAt || !endsAt) {
+    return null;
+  }
+  if (new Date(endsAt) < new Date(startsAt)) {
+    return "終了日時は開始日時以降にしてください";
+  }
+  return null;
+}
+
 export function fieldError(value: string, validate: (value: string) => string | null): string | null {
   if (!value) {
     return null;

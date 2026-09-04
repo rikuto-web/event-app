@@ -4,7 +4,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.repositories.event_repository import EventRepository
-from app.schemas.event import EventListItem, EventListResponse, ParticipationSummary
+from app.schemas.event import EventCreateRequest, EventDetailResponse, EventListItem, EventListResponse, ParticipationSummary
 
 
 class EventService:
@@ -45,3 +45,22 @@ class EventService:
             for row in rows
         ]
         return EventListResponse(items=items, total=len(items))
+
+    def create_event(self, user_id: UUID, data: EventCreateRequest) -> EventDetailResponse:
+        event = self.events.create(
+            user_id,
+            title=data.title,
+            description=data.description,
+            starts_at=data.starts_at,
+            ends_at=data.ends_at,
+            location=data.location,
+        )
+        return EventDetailResponse(
+            id=event.id,
+            title=event.title,
+            description=event.description,
+            starts_at=event.starts_at,
+            ends_at=event.ends_at,
+            location=event.location,
+            my_role="owner",
+        )

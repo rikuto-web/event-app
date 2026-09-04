@@ -246,6 +246,20 @@
   color-scheme: dark;
 }
 
+.picker-field-form .picker-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.picker-input {
+  cursor: pointer;
+  color-scheme: dark;
+}
+
+.picker-input::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
 .date-input:focus {
   outline: none;
   border-color: var(--accent);
@@ -612,6 +626,52 @@
 .modal-panel h2 {
   margin: 0;
   font-size: 1.05rem;
+}
+
+.modal-panel-wide {
+  max-width: 32rem;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 0.75rem;
+}
+
+.modal-subtitle {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.event-create-form {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.event-textarea {
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+.event-datetime-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.modal-actions .btn {
+  min-width: 5.5rem;
 }
 
 .modal-event-link {
