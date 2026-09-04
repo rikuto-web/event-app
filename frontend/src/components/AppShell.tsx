@@ -1,17 +1,16 @@
 import { Show, type Component, type JSX } from "solid-js";
-import { A, useNavigate } from "@solidjs/router";
+import { A } from "@solidjs/router";
 
 type AppShellProps = {
   children: JSX.Element;
   isAuthenticated?: boolean;
   displayName?: string;
+  onLogout?: () => void | Promise<void>;
 };
 
 export const AppShell: Component<AppShellProps> = (props) => {
-  const navigate = useNavigate();
-
   const handleLogout = () => {
-    navigate("/login");
+    void props.onLogout?.();
   };
 
   return (
