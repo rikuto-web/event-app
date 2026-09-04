@@ -1,6 +1,6 @@
 import { Show, type Component } from "solid-js";
 import { getScheduleRange, getViewMode, monthKey } from "../../lib/event-dates";
-import { DateInput } from "./DateInput";
+import { PickerField } from "../PickerField";
 import { RoleFilterToggle, type RoleFilterValue } from "./RoleFilterToggle";
 
 type EventToolbarProps = {
@@ -85,13 +85,17 @@ export const EventToolbar: Component<EventToolbarProps> = (props) => {
 
         <Show when={view() === "schedule"}>
           <div class="schedule-range-inputs">
-            <DateInput
+            <PickerField
+              variant="inline"
+              mode="date"
               label="開始日"
               value={scheduleRange().from}
               onChange={(from) => props.onNavigate(buildQuery({ from }))}
             />
             <span class="schedule-range-sep">〜</span>
-            <DateInput
+            <PickerField
+              variant="inline"
+              mode="date"
               label="終了日"
               value={scheduleRange().to}
               onChange={(to) => props.onNavigate(buildQuery({ to }))}

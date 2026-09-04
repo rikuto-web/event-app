@@ -4,6 +4,7 @@ type AuthFieldProps = {
   id: string;
   label: string;
   error?: string | null;
+  required?: boolean;
   inputProps: JSX.InputHTMLAttributes<HTMLInputElement>;
 };
 
@@ -13,6 +14,7 @@ export const AuthField: Component<AuthFieldProps> = (props) => {
       <div class="auth-label-row">
         <label class="auth-label" for={props.id}>
           {props.label}
+          {props.required ? " *" : ""}
         </label>
         <span class="auth-inline-error" role="alert" aria-live="polite">
           {props.error ?? ""}

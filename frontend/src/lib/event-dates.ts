@@ -126,3 +126,60 @@ export function formatEventTime(value: string): string {
 }
 
 export const HOUR_PX = 48;
+
+export function defaultRangeForDay(year: number, month: number, day: number): {
+  startsAt: string;
+  endsAt: string;
+} {
+  const date = `${year}-${pad(month + 1)}-${pad(day)}`;
+  return {
+    startsAt: `${date}T10:00`,
+    endsAt: `${date}T12:00`,
+  };
+}
+
+export function nowLocalDatetimeInput(now = new Date()): string {
+  return toLocalDatetimeInput(now.toISOString());
+}
+
+export function defaultRangeFromNow(now = new Date()): { startsAt: string; endsAt: string } {
+  const startsAt = nowLocalDatetimeInput(now);
+  const end = new Date(now);
+  end.setHours(end.getHours() + 2);
+  return {
+    startsAt,
+    endsAt: nowLocalDatetimeInput(end),
+  };
+}
+
+export function addHoursToLocalDatetime(localDatetime: string, hours: number): string {
+  const date = new Date(localDatetime);
+  date.setHours(date.getHours() + hours);
+  return nowLocalDatetimeInput(date);
+}
+
+export function resolveCreateDefaults(defaults?: { startsAt?: string; endsAt?: string }): {
+  startsAt: string;
+  endsAt: string;
+} {
+  if (defaults?.startsAt && defaults?.endsAt) {
+    return {
+      startsAt: toLocalDatetimeInput(defaults.startsAt),
+      endsAt: toLocalDatetimeInput(defaults.endsAt),
+    };
+  }
+  return defaultRangeFromNow();
+}
+
+export function toLocalDatetimeInput(value: string): string {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
+    return value;
+  }
+  const date = new Date(value);
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+export function fromLocalDatetimeInput(value: string): string {
+  return new Date(value).toISOString();
+}

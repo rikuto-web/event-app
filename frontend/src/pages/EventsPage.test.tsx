@@ -76,4 +76,64 @@ describe("EventsPage", () => {
       ).toBe(true);
     });
   });
+
+  it("opens create modal when create=1", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(sampleEvents), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    window.history.pushState({}, "", "/events?month=2026-09&create=1");
+    render(() => (
+      <Router>
+        <Route path="/events" component={EventsPage} />
+      </Router>
+    ));
+
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "新規イベント" })).toBeInTheDocument();
+  });
+
+  it("prefills day defaults when day param is present", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(sampleEvents), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    window.history.pushState({}, "", "/events?month=2026-09&create=1&day=15");
+    render(() => (
+      <Router>
+        <Route path="/events" component={EventsPage} />
+      </Router>
+    ));
+
+    expect(await screen.findByLabelText("開始 *")).toHaveValue("2026-09-15T10:00");
+    expect(screen.getByLabelText("終了 *")).toHaveValue("2026-09-15T12:00");
+  });
+
+  it("prefills current datetime when opened without day", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(sampleEvents), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    window.history.pushState({}, "", "/events?month=2026-09&create=1");
+    render(() => (
+      <Router>
+        <Route path="/events" component={EventsPage} />
+      </Router>
+    ));
+
+    const startsAt = (await screen.findByLabelText("開始 *")) as HTMLInputElement;
+    expect(startsAt.value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    expect((screen.getByLabelText("終了 *") as HTMLInputElement).value).toMatch(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/,
+    );
+  });
 });

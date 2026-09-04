@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { dateOnlyStr, getScheduleRange, groupEventsByLocalDay, monthKey, parseDateOnly } from "./event-dates";
+import {
+  dateOnlyStr,
+  defaultRangeForDay,
+  defaultRangeFromNow,
+  fromLocalDatetimeInput,
+  getScheduleRange,
+  groupEventsByLocalDay,
+  monthKey,
+  parseDateOnly,
+  resolveCreateDefaults,
+  toLocalDatetimeInput,
+} from "./event-dates";
 import type { EventListItem } from "./events";
 
 const sampleEvent = (startsAt: string, title: string): EventListItem => ({
@@ -40,5 +51,38 @@ describe("event-dates", () => {
 
   it("formats date only string", () => {
     expect(dateOnlyStr(new Date(2026, 8, 4))).toBe("2026-09-04");
+  });
+
+  it("builds default range for day", () => {
+    expect(defaultRangeForDay(2026, 8, 10)).toEqual({
+      startsAt: "2026-09-10T10:00",
+      endsAt: "2026-09-10T12:00",
+    });
+  });
+
+  it("converts local datetime input to ISO", () => {
+    const iso = fromLocalDatetimeInput("2026-09-10T10:00");
+    expect(toLocalDatetimeInput(iso)).toBe("2026-09-10T10:00");
+  });
+
+  it("builds default range from now", () => {
+    const now = new Date(2026, 8, 10, 15, 30);
+    expect(defaultRangeFromNow(now)).toEqual({
+      startsAt: "2026-09-10T15:30",
+      endsAt: "2026-09-10T17:30",
+    });
+  });
+
+  it("resolves create defaults with day range or now", () => {
+    expect(
+      resolveCreateDefaults({ startsAt: "2026-09-15T10:00", endsAt: "2026-09-15T12:00" }),
+    ).toEqual({
+      startsAt: "2026-09-15T10:00",
+      endsAt: "2026-09-15T12:00",
+    });
+
+    const resolved = resolveCreateDefaults();
+    expect(resolved.startsAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    expect(resolved.endsAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
   });
 });

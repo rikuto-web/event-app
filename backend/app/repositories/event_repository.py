@@ -106,3 +106,28 @@ class EventRepository:
                 )
             for event, my_role, going, maybe, not_going in rows
         ]
+
+    def create(
+        self,
+        owner_id: UUID,
+        *,
+        title: str,
+        description: str | None,
+        starts_at: datetime,
+        ends_at: datetime,
+        location: str | None,
+    ) -> Event:
+        event = Event(
+            owner_id=owner_id,
+            title=title,
+            description=description,
+            starts_at=starts_at,
+            ends_at=ends_at,
+            location=location,
+        )
+        self.db.add(event)
+        self.db.flush()
+        self.db.add(EventMember(event_id=event.id, user_id=owner_id, role="owner"))
+        self.db.commit()
+        self.db.refresh(event)
+        return event
