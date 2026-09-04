@@ -25,21 +25,31 @@ describe("App", () => {
       refresh_token: "refresh-token",
     });
 
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          id: "user-1",
-          email: "alice@example.com",
-          display_name: "Alice",
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      ),
-    );
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/users/me")) {
+        return new Response(
+          JSON.stringify({
+            id: "user-1",
+            email: "alice@example.com",
+            display_name: "Alice",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (url.includes("/events")) {
+        return new Response(JSON.stringify({ items: [], total: 0 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(null, { status: 404 });
+    });
 
     window.history.pushState({}, "", "/events");
     render(() => <App />);
 
     expect(await screen.findByText("Alice")).toBeInTheDocument();
-    expect(screen.getByText("イベント一覧")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "カレンダー" })).toBeInTheDocument();
   });
 });

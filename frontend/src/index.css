@@ -1,12 +1,62 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=IBM+Plex+Mono:wght@400;500&display=swap");
+
 :root {
-  font-family: "DM Sans", system-ui, sans-serif;
-  line-height: 1.5;
-  color: #1a1a2e;
-  background: #f5f6fa;
+  --bg: #0f1419;
+  --surface: #1a222d;
+  --surface-2: #242f3d;
+  --border: #2e3a4a;
+  --text: #e8edf4;
+  --muted: #8b9cb3;
+  --accent: #3dd6c6;
+  --accent-dim: #2a9d90;
+  --accent-glow: rgba(61, 214, 198, 0.15);
+  --warm: #ffb347;
+  --danger: #ff6b6b;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  --font: "DM Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", monospace;
+
+  font-family: var(--font);
+  line-height: 1.55;
+  color: var(--text);
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(61, 214, 198, 0.12), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(255, 179, 71, 0.06), transparent),
+    var(--bg);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
+  min-height: 100dvh;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
 }
 
 .auth-input,
