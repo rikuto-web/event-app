@@ -16,11 +16,20 @@ output "vcn_id" {
 
 output "fe_vm_public_ip" {
   description = "Public IP of fe-vm (SSH, direct access during bootstrap)."
-  value       = module.fe_vm.public_ip
+  value       = var.enable_fe_vm ? module.fe_vm[0].public_ip : null
 }
 
 output "fe_vm_private_ip" {
-  value = module.fe_vm.private_ip
+  value = var.enable_fe_vm ? module.fe_vm[0].private_ip : null
+}
+
+output "infra_phase" {
+  description = "api-only = phase 1 done; complete = both VMs ready."
+  value = var.enable_fe_vm ? (
+    try(module.fe_vm[0].public_ip, null) != null ? "complete" : "fe-pending"
+  ) : (
+    try(module.api_vm.public_ip, null) != null ? "api-only" : "api-pending"
+  )
 }
 
 output "api_vm_public_ip" {
