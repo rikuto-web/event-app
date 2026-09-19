@@ -14,32 +14,14 @@ output "vcn_id" {
   value = module.vcn.vcn_id
 }
 
-output "fe_vm_public_ip" {
-  description = "Public IP of fe-vm (SSH, direct access during bootstrap)."
-  value       = var.enable_fe_vm ? module.fe_vm[0].public_ip : null
+output "app_vm_public_ip" {
+  description = "Public IP of app-vm (SSH, bootstrap)."
+  value       = module.app_vm.public_ip
 }
 
-output "fe_vm_private_ip" {
-  value = var.enable_fe_vm ? module.fe_vm[0].private_ip : null
-}
-
-output "infra_phase" {
-  description = "api-only = phase 1 done; complete = both VMs ready."
-  value = var.enable_fe_vm ? (
-    try(module.fe_vm[0].public_ip, null) != null ? "complete" : "fe-pending"
-  ) : (
-    try(module.api_vm.public_ip, null) != null ? "api-only" : "api-pending"
-  )
-}
-
-output "api_vm_public_ip" {
-  description = "Public IP of api-vm (SSH)."
-  value       = module.api_vm.public_ip
-}
-
-output "api_vm_private_ip" {
-  description = "Private IP referenced by fe-vm nginx proxy."
-  value       = module.api_vm.private_ip
+output "app_vm_private_ip" {
+  description = "Private IP attached to the load balancer backend."
+  value       = module.app_vm.private_ip
 }
 
 output "load_balancer_public_ip" {

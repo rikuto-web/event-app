@@ -41,36 +41,19 @@ module "vcn" {
   dns_label           = var.dns_label
 }
 
-module "fe_vm" {
-  count  = var.enable_fe_vm ? 1 : 0
+module "app_vm" {
   source = "../../modules/compute"
 
   compartment_id      = local.compartment_id
   availability_domain = local.availability_domain
   subnet_id           = module.vcn.subnet_id
-  display_name        = "${var.project_prefix}-fe-vm"
+  display_name        = "${var.project_prefix}-app-vm"
   shape               = var.compute_shape
   image_id            = data.oci_core_images.oracle_linux.images[0].id
   ssh_public_key      = var.ssh_public_key
-  nsg_ids             = [oci_core_network_security_group.fe.id]
-  ocpus               = var.fe_ocpus
-  memory_in_gbs       = var.fe_memory_in_gbs
-  assign_public_ip    = true
-}
-
-module "api_vm" {
-  source = "../../modules/compute"
-
-  compartment_id      = local.compartment_id
-  availability_domain = local.availability_domain
-  subnet_id           = module.vcn.subnet_id
-  display_name        = "${var.project_prefix}-api-vm"
-  shape               = var.compute_shape
-  image_id            = data.oci_core_images.oracle_linux.images[0].id
-  ssh_public_key      = var.ssh_public_key
-  nsg_ids             = [oci_core_network_security_group.api.id]
-  ocpus               = var.api_ocpus
-  memory_in_gbs       = var.api_memory_in_gbs
+  nsg_ids             = [oci_core_network_security_group.app.id]
+  ocpus               = var.app_ocpus
+  memory_in_gbs       = var.app_memory_in_gbs
   assign_public_ip    = true
 }
 
@@ -80,8 +63,8 @@ module "load_balancer" {
   compartment_id      = local.compartment_id
   display_name_prefix = var.project_prefix
   subnet_id           = module.vcn.subnet_id
-  create_backend      = var.enable_fe_vm
-  backend_ip          = var.enable_fe_vm ? module.fe_vm[0].private_ip : ""
+  create_backend      = true
+  backend_ip          = module.app_vm.private_ip
   backend_port        = 80
   listener_port       = 80
 }

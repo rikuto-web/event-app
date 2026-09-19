@@ -38,7 +38,7 @@ flowchart TB
 | 状態 | createResource + WebSocket フック | リアルタイム反映 |
 | CSS | UnoCSS | スタイル |
 | バックエンド | Python / FastAPI / Granian（コンテナ） | REST、WebSocket、認可 |
-| データベース | PostgreSQL（コンテナ） | 永続化 |
+| データベース | PostgreSQL（ローカル: コンテナ / 本番: 外部 PaaS） | 永続化 |
 | オブジェクトストレージ | OCI Object Storage | イベント画像 |
 | コンテナ基盤 | Docker / Docker Compose | ローカル・本番の実行環境 |
 | レジストリ | OCI Container Registry（OCIR） | 本番イメージ配布 |
@@ -65,17 +65,16 @@ flowchart LR
 **想定 compose 構成（実装時）**
 
 ```
-docker-compose.yml          # ローカル開発（全サービス）
-docker-compose.fe.yml       # 本番 fe-vm 用（nginx + frontend）
-docker-compose.api.yml      # 本番 api-vm 用（api + postgres）
+docker-compose.yml          # ローカル開発（frontend + api + postgres）
+docker-compose.prod.yml     # 本番 app-vm 用（nginx + frontend + api。DB は外部）
 ```
 
 ```bash
 # ローカル
 docker compose up --build
 
-# 本番 VM（イメージは OCIR から pull）
-docker compose -f docker-compose.api.yml pull && up -d
+# 本番 app-vm（イメージは OCIR から pull）
+docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d
 ```
 
 開発時はオリジンが異なるため、API が CORS で `http://localhost:5173` を許可する。
@@ -88,47 +87,41 @@ docker compose -f docker-compose.api.yml pull && up -d
 
 | 項目 | 初級（recipe-app） | 本アプリ（event-app） |
 | --- | --- | --- |
-| 想定 VM | Ampere A1 Flex（在庫があれば） | Ampere A1 Flex × 2（fe + api） |
-| 在庫不足時の実態 | **E2.1.Micro（x86）1 台** にフォールバック | cron で Ampere 取得を待つ |
-| Always Free 枠 | x86 Micro と Ampere A1 は **別カウント** | Ampere 合計 2 OCPU / 12 GB から 6 GB 使用 |
+| Compute | **E2.1.Micro（x86）1 台**（在庫都合） | **E2.1.Micro 1 台**（app-vm） |
+| DB | コンテナ内 PostgreSQL 等 | **外部 PaaS PostgreSQL**（Neon / Supabase 等） |
+| Always Free 枠 | x86 Micro 最大 2 台 | Micro 1 台 + LB + Object Storage |
 
-**Micro を destroy しても Ampere の空き容量には直接つながらない。** 初級 destroy の意味は次の 2 点に限られる。
+初級 destroy の主な意味:
 
 1. **同時公開しない**（URL・運用の整理）
-2. **x86 Micro 枠**（最大 2 台）を空ける — 本アプリが Ampere を取れない場合の予備ではない
+2. **x86 Micro 枠**（最大 2 台）を空ける — 本アプリの app-vm 用
 
 | 手順 | 内容 |
 | --- | --- |
-| 1 | （任意）recipe-app `terraform destroy` — Micro 等の削除 |
-| 2 | cron / 手動で本アプリ `terraform apply` — **Ampere fe-vm / api-vm を新規作成** |
-| 3 | イメージを OCIR に push |
-| 4 | fe-vm / api-vm で `docker compose up -d` |
+| 1 | （任意）recipe-app `terraform destroy` |
+| 2 | 本アプリ `terraform apply` — **app-vm を新規作成** |
+| 3 | 外部 PostgreSQL を用意（Terraform 管理外） |
+| 4 | イメージを OCIR に push |
+| 5 | app-vm で `docker compose up -d` |
 
-Ampere が取れない間は本アプリの apply も失敗しうる。初級の存在有無とは独立した問題。
-
-### 3.2 大阪リージョンと cron リトライ
+### 3.2 大阪リージョンと apply リトライ
 
 | 項目 | 内容 |
 | --- | --- |
 | ホームリージョン | `ap-osaka-1` |
-| 課題 | Ampere A1 容量不足（Out of host capacity） |
-| 対策 | Mac 上 cron で `terraform apply` を定期実行 |
-| 参考 | recipe-app `infra/deploy/hourly-cron-apply.sh` を移植 |
-
-```bash
-0 * * * * /path/to/event-app/infra/deploy/hourly-cron-apply.sh # event-oci-hourly-retry
-```
+| 旧課題 | Ampere A1 容量不足（`Out of host capacity`）— **2026-09 時点で不採用に変更** |
+| 現構成 | E2.1.Micro — 通常 1 回の apply で取得可能 |
+| 保険 | 失敗時のみ launchd / `retry-apply.sh`（[infra/README](../infra/README.md)） |
 
 ### 3.3 OCI Always Free リソース配分
 
-| リソース | 配分 | Always Free |
-| --- | --- | --- |
-| fe-vm（Docker ホスト） | 1 OCPU / 3 GB | Compute |
-| api-vm（Docker ホスト） | 1 OCPU / 3 GB | Compute |
-| Load Balancer | Flexible LB 1 基 | ○ |
-| Object Storage | Standard 20 GB 以内 | ○ |
-| Container Registry（OCIR） | 500 リポジトリ / ストレージ枠内 | ○ |
-| **Compute 合計** | **2 OCPU / 6 GB** | |
+| リソース | 配分 | Always Free | AWS 相当 |
+| --- | --- | --- | --- |
+| app-vm（Docker ホスト） | E2.1.Micro（x86, 1 GB） | Compute（Micro 枠） | EC2 |
+| Load Balancer | Flexible LB 1 基 | ○ | ALB |
+| Object Storage | Standard 20 GB 以内 | ○ | S3 |
+| Container Registry（OCIR） | 500 リポジトリ / ストレージ枠内 | ○ | ECR |
+| PostgreSQL | **外部 PaaS**（無料枠） | OCI 外 | RDS |
 
 ### 3.4 構成図（本番・コンテナ）
 
@@ -138,64 +131,58 @@ flowchart TB
   LB -->|HTTP_80| Nginx[nginx_container]
   Nginx -->|"/"| SPA[frontend_container]
   Nginx -->|"/api /ws"| API[api_container]
-  API --> PG[(postgres_container)]
+  API --> PG[(外部_PaaS_PostgreSQL)]
   API --> OS[(Object_Storage)]
   OCIR[OCIR] -.->|docker_pull| Nginx
   OCIR -.->|docker_pull| SPA
   OCIR -.->|docker_pull| API
-  subgraph fe_vm [fe_vm_Dockerホスト]
+  subgraph app_vm [app_vm_E2_Micro]
     Nginx
     SPA
-  end
-  subgraph api_vm [api_vm_Dockerホスト]
     API
-    PG
   end
 ```
 
-| VM | コンテナ | 役割 |
+| ホスト | コンテナ | 役割 |
 | --- | --- | --- |
-| fe-vm | nginx, frontend | 静的 SPA 配信、`/api` `/ws` を api-vm へプロキシ |
-| api-vm | api, postgres | FastAPI + WebSocket + DB |
+| app-vm | nginx, frontend, api | 静的 SPA 配信、`/api` `/ws` を同一 VM 内 api へプロキシ |
 
-ブラウザ → LB → fe-vm nginx コンテナ → api-vm api コンテナ。PostgreSQL は api-vm 内のコンテナ（volume 永続化）。
+ブラウザ → LB → app-vm nginx → frontend（静的）/ api（REST・WS）。PostgreSQL は **VM 外のマネージド DB**（AWS で言う RDS 相当）。
 
-### 3.4.1 DB の置き方（2 VM / 3 コンテナ構成）
+### 3.4.1 DB の置き方（1 VM + 外部 DB）
 
-**結論: PostgreSQL は api イメージに含めず、api-vm 上の別コンテナとして動かす。Compute インスタンスは 2 台（fe-vm + api-vm）。**
+**結論: PostgreSQL は app-vm 上に載せず、外部 PaaS（Neon / Supabase 等）を使う。**
 
 | パターン | 構成 | 本次 |
 | --- | --- | --- |
-| A. API コンテナに DB 同梱 | 1 コンテナに FastAPI + PostgreSQL | **不採用**（プロセス分離・バックアップ・再起動が困難） |
-| B. api-vm 上で Compose | api コンテナ + **postgres コンテナ**（同一 VM） | **採用** |
-| C. DB 専用 VM | fe-vm + api-vm + **db-vm** の 3 インスタンス | **不採用**（Always Free 2 OCPU / 12 GB では 3 VM は非現実的） |
+| A. API コンテナに DB 同梱 | 1 コンテナに FastAPI + PostgreSQL | **不採用** |
+| B. app-vm 上で postgres コンテナ | api + postgres（同一 VM, 1 GB） | **不採用**（メモリ不足） |
+| C. 2 VM（fe + api）+ postgres コンテナ | Ampere A1 × 2 | **不採用**（大阪在庫不足） |
+| D. **外部 PaaS PostgreSQL** | app-vm（nginx + fe + api）+ 外部 DB | **採用** |
 
 ```
-fe-vm（1 OCPU / 3 GB）
+app-vm（E2.1.Micro / 1 GB）
 ├── nginx コンテナ
-└── frontend コンテナ
+├── frontend コンテナ
+└── api コンテナ      ← DATABASE_URL で外部 PostgreSQL へ
 
-api-vm（1 OCPU / 3 GB）
-├── api コンテナ      ← FastAPI / WebSocket のみ
-└── postgres コンテナ ← PostgreSQL 専用（Docker volume で data 永続化）
+外部 PaaS（Neon / Supabase 等）
+└── PostgreSQL        ← バックアップ・パッチは PaaS 側
 ```
 
-- **api コンテナと postgres コンテナは別**。api の Dockerfile に PostgreSQL は入れない。
-- 5432 は Compose 内部ネットワークのみ。インターネット / fe-vm からは直接触れない。
-- Always Free の都合で **Compute は 2 台** が上限に近い。DB 用に 3 台目は取らない。
+- api の Dockerfile に PostgreSQL は入れない。
+- 5432 は PaaS への TLS 接続（インターネット経由）。NSG で app-vm からの egress を許可。
+- OCI Always Free に PostgreSQL 相当の無料マネージド DB がないため、**外部無料枠** を RDS 代替とする。
 
-### 3.4.2 マネージド DB を使わない理由
+### 3.4.2 外部マネージド DB を採用する理由
 
-**マネージド DB** とは AWS の **RDS** のように、パッチ適用・バックアップ・可用性をクラウド側が担うデータベース専用サービスのこと。OCI には次がある。
+| 選択肢 | Always Free | 本次 |
+| --- | --- | --- |
+| OCI Database with PostgreSQL | 有料 | 不採用 |
+| postgres コンテナ on 1 GB Micro | Compute 枠内だが RAM 不足 | 不採用 |
+| **Neon / Supabase 等（外部 PaaS）** | 無料枠あり | **採用**（RDS 相当） |
 
-| OCI サービス | AWS 相当 | Always Free | 本次 |
-| --- | --- | --- | --- |
-| **OCI Database with PostgreSQL** | RDS for PostgreSQL | **なし（有料）** | 不採用 |
-| **Autonomous Database** | （Oracle 専用 RDS 的） | **あり**（2 インスタンス） | 不採用（Oracle DB であり PostgreSQL ではない） |
-| **MySQL HeatWave** | RDS for MySQL 的 | **あり**（50 GB） | 不採用（本アプリは PostgreSQL 前提） |
-| **postgres コンテナ on api-vm** | EC2 上に自前 PostgreSQL | Compute 枠内 | **採用** |
-
-PostgreSQL を **無料のマネージド** で使う選択肢は OCI Always Free にはない。Autonomous / MySQL HeatWave は無料だが DB エンジンが異なるため、スキーマ・SQL・ドライバを作り直す必要がある。コストと PostgreSQL 前提を優先し、**api-vm 上の postgres コンテナ** とする。
+1 GB RAM の Micro に api + postgres を同居させると、WebSocket と DB キャッシュで OOM になりやすい。DB を VM 外に出すことで **EC2 + RDS + ALB + S3** に近い責務分離を Always Free 枠内で実現する。
 
 ### 3.4.3 フロントとバックの通信経路（誰が誰に聞いているか）
 
@@ -219,7 +206,7 @@ sequenceDiagram
 
   Browser->>LB: GET /api/v1/events（JS から fetch）
   LB->>Nginx: 転送
-  Nginx->>API: proxy_pass api-vm:8080
+  Nginx->>API: proxy_pass api:8080
   API-->>Nginx: JSON
   Nginx-->>Browser: JSON（中継のみ、合成しない）
 
@@ -232,9 +219,9 @@ sequenceDiagram
 | 通信 | 実際の経路 |
 | --- | --- |
 | 初回ページ読込 | ブラウザ → LB → **nginx** → frontend コンテナ（または nginx が配る静的ファイル） |
-| REST / WebSocket | **ブラウザ上の JS** → LB → **nginx** → **api-vm の api コンテナ** |
-| frontend → api コンテナ直接 | **しない**（本番）。fe-vm と api-vm は別ホスト |
-| nginx の役割 | 同一オリジン（`https://example.com`）の入口。**`/api` `/ws` を api-vm に中継**するリバースプロキシ |
+| REST / WebSocket | **ブラウザ上の JS** → LB → **nginx** → **同一 VM 内 api コンテナ** |
+| frontend → api コンテナ直接 | **しない**（本番）。ブラウザは nginx 経由のみ |
+| nginx の役割 | 同一オリジン（`https://example.com`）の入口。**`/api` `/ws` を api コンテナに中継**するリバースプロキシ |
 
 - **frontend コンテナ**はビルド済み JS/CSS/HTML を置くだけ。サーバー側から API を呼ばない（SSR なし）。
 - **SolidJS の fetch / WebSocket** はブラウザが `/api/...` `/ws/...` に向ける。URL は nginx のホスト名（= LB のドメイン）と同じオリジン。
@@ -248,10 +235,11 @@ sequenceDiagram
 | --- | --- | --- |
 | **Object Storage** | **S3** | 画像などのオブジェクト保存。バケット + 公開 URL |
 | **OCIR** | **ECR** | Docker **イメージの保管場所**（レジストリ）。デプロイそのものではない |
-| **Compute VM + Docker** | EC2 + Docker | OCIR から `docker pull` し、VM 上でコンテナを起動 |
-| **Load Balancer** | ALB | HTTPS 入口。fe-vm nginx へ転送 |
+| **Compute VM + Docker** | EC2 + Docker | OCIR から `docker pull` し、app-vm 上でコンテナを起動 |
+| **Load Balancer** | ALB | HTTPS 入口。app-vm nginx へ転送 |
+| **外部 PostgreSQL** | RDS | api コンテナが `DATABASE_URL` で接続 |
 
-**OCIR は「IaaS のコンテナデプロイ機能の名前」ではない。** イメージを push/pull する **コンテナレジストリ**。実際の起動は Compute VM 上の Docker Compose が行う。OCI には Container Instances（VM なしでコンテナ起動）もあるが、本次は LB + 2 VM 構成のため **Compute + OCIR + Compose** を採用する。
+**OCIR は「IaaS のコンテナデプロイ機能の名前」ではない。** イメージを push/pull する **コンテナレジストリ**。実際の起動は Compute VM 上の Docker Compose が行う。Container Instances（Fargate 相当）は採用せず、**EC2 + Docker Compose** パターンを維持する。
 
 ### 3.5 Load Balancer
 
@@ -259,7 +247,7 @@ sequenceDiagram
 | --- | --- |
 | SSL/TLS 終端 | 証明書を LB に配置 |
 | エントリポイント | 公開 URL を LB に集約 |
-| WebSocket | Layer 7 で Upgrade を fe-vm へ転送（nginx が api-vm へプロキシ） |
+| WebSocket | Layer 7 で Upgrade を app-vm へ転送（nginx が api へプロキシ） |
 
 ### 3.6 OCI Container Registry（OCIR）
 
@@ -276,7 +264,7 @@ sequenceDiagram
 ```bash
 docker build -t ${REGION}.ocir.io/${NS}/event-api:${TAG} ./backend
 docker push ${REGION}.ocir.io/${NS}/event-api:${TAG}
-ssh api-vm 'cd /opt/event-app && docker compose pull && docker compose up -d'
+ssh app-vm 'cd /opt/event-app && docker compose -f docker-compose.prod.yml pull && up -d'
 ```
 
 ### 3.7 Object Storage
@@ -292,9 +280,9 @@ ssh api-vm 'cd /opt/event-app && docker compose pull && docker compose up -d'
 | 通信 | 方針 |
 | --- | --- |
 | LB: 443 | 利用者 |
-| fe-vm: 80 | LB のみ |
-| api-vm: 8080 | fe-vm プライベート IP のみ |
-| api-vm: 5432 | api コンテナ → postgres コンテナ（Compose 内部） |
+| app-vm: 80 | LB のみ |
+| app-vm: 8080 | Compose 内部（nginx → api のみ） |
+| 外部 DB: 5432 | api コンテナ → PaaS PostgreSQL（TLS） |
 | SSH: 22 | 管理者 IP のみ |
 
 ## 4. 他ユーザー更新の同期方式（WebSocket）
@@ -329,7 +317,7 @@ ssh api-vm 'cd /opt/event-app && docker compose pull && docker compose up -d'
 | リソース | 目的 |
 | --- | --- |
 | VCN / Subnet / NSG | ネットワーク |
-| Compute × 2 | Docker ホスト（fe-vm / api-vm） |
+| Compute × 1 | Docker ホスト（app-vm / E2.1.Micro） |
 | Load Balancer | HTTPS 入口 |
 | Object Storage Bucket | 画像 |
 | OCIR リポジトリ | コンテナイメージ（Terraform または手動作成） |
@@ -340,7 +328,7 @@ ssh api-vm 'cd /opt/event-app && docker compose pull && docker compose up -d'
 | --- | --- |
 | Docker イメージの中身 | CI / `docker build` |
 | compose ファイルの env 値 | `.env`（Git 管理外） |
-| PostgreSQL データ | Docker volume（ランタイム） |
+| PostgreSQL（外部 PaaS） | Neon / Supabase 等の Console で作成 |
 
 ### 5.3 ディレクトリ構成（予定）
 
@@ -357,8 +345,7 @@ infra/
   deploy/
     hourly-cron-apply.sh
     deploy.sh              # OCIR push + compose up
-    docker-compose.fe.yml
-    docker-compose.api.yml
+    docker-compose.prod.yml
 backend/Dockerfile
 frontend/Dockerfile
 nginx/Dockerfile
@@ -373,10 +360,8 @@ flowchart TD
   B -->|No| A
   B -->|Yes| C[docker_build]
   C --> D[OCIR_push]
-  D --> E1[SSH_fe_vm_compose_up]
-  D --> E2[SSH_api_vm_compose_up]
-  E1 --> F[LB_疎通確認]
-  E2 --> F
+  D --> E[SSH_app_vm_compose_up]
+  E --> F[LB_疎通確認]
   F --> G[WebSocket_動作確認]
 ```
 
@@ -384,15 +369,14 @@ flowchart TD
 | --- | --- |
 | ビルド | `docker compose build` |
 | プッシュ | `docker push ${OCIR}/event-api:tag` |
-| 本番起動 | `docker compose -f docker-compose.api.yml up -d` |
+| 本番起動 | `docker compose -f docker-compose.prod.yml up -d` |
 | マイグレーション | api コンテナ内 `alembic upgrade head`（起動時 entrypoint でも可） |
 
 ## 7. バックアップ
 
 | 対象 | 方法 |
 | --- | --- |
-| PostgreSQL | `docker compose exec postgres pg_dump` → Object Storage |
-| Docker volume | pg_dump を主とし、volume snapshot は任意 |
+| PostgreSQL | PaaS 側の自動バックアップ + 必要時 `pg_dump` → Object Storage |
 | OCIR イメージ | タグ付きで履歴保持 |
 
 ## 8. 監視・ログ
@@ -402,12 +386,12 @@ docker compose logs -f api
 docker compose logs -f nginx
 ```
 
-- LB ヘルスチェック: fe-vm nginx `/health`
+- LB ヘルスチェック: app-vm nginx `/health`
 - api コンテナ: `/health` エンドポイント
 
 ## 9. HTTPS
 
-LB で TLS 終端。fe-vm nginx までは HTTP（VCN 内）。
+LB で TLS 終端。app-vm nginx までは HTTP（VCN 内）。
 
 ## 10. 将来拡張
 

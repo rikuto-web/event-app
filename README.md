@@ -27,7 +27,7 @@
 | CSS | UnoCSS | ビルド時に最適化される原子 CSS |
 | バックエンド | Python / FastAPI / Granian | REST API、WebSocket、バリデーション、認可 |
 | ORM / マイグレーション | SQLAlchemy 2.0 / Alembic | スキーマ管理、型付きクエリ |
-| データベース | PostgreSQL（コンテナ） | 複数ユーザー・同時書き込み向け RDB |
+| データベース | PostgreSQL（ローカル: コンテナ / 本番: 外部 PaaS） | 複数ユーザー・同時書き込み向け RDB |
 | オブジェクトストレージ | OCI Object Storage | イベント画像（S3 互換 API） |
 | コンテナ | Docker / Docker Compose | ローカル・本番とも同一 compose 構成で起動 |
 | コンテナレジストリ | OCI Container Registry（OCIR） | 本番イメージの保管・VM から pull |
@@ -56,7 +56,7 @@
 
 ### データベース: PostgreSQL（コンテナ）
 
-api-vm 上の Docker Compose 内で PostgreSQL コンテナを起動します。複数ユーザー同時編集に必要なトランザクションと行ロックを確保し、データは Docker volume で永続化します。
+ローカルでは Docker Compose 内の PostgreSQL コンテナを使います。本番では **外部 PaaS**（Neon / Supabase 等）に接続し、1 GB RAM の Micro VM 上で DB を同居させない構成とします（RDS 相当）。
 
 ### ストレージ: OCI Object Storage
 
@@ -64,23 +64,23 @@ api-vm 上の Docker Compose 内で PostgreSQL コンテナを起動します。
 
 ### インフラ: OCI IaaS + Load Balancer + Terraform
 
-AWS 無料枠は使い切り済みのため OCI Always Free を採用します。Compute VM は **Docker ホスト** として使い、アプリ本体はコンテナで動かします。初級（recipe-app）は destroy で整理可能だが、Micro と Ampere は別枠（[07 §3.1](docs/07-architecture.md)）。
+AWS 無料枠は使い切り済みのため OCI Always Free を採用します。Compute は **E2.1.Micro 1 台**（EC2 相当）+ **外部 PostgreSQL**（RDS 相当）+ LB（ALB）+ Object Storage（S3）の構成です（[07 §3](docs/07-architecture.md)）。
 
 ## システム構成（概要）
 
 ```mermaid
 flowchart TB
   User[利用者] -->|HTTPS| LB[OCI_Load_Balancer]
-  LB --> Nginx[nginx_container_on_fe_vm]
+  LB --> Nginx[nginx_on_app_vm]
   Nginx --> FE[frontend_container]
-  Nginx -->|"/api /ws"| API[api_container_on_api_vm]
-  API --> PG[(postgres_container)]
+  Nginx -->|"/api /ws"| API[api_container]
+  API --> PG[(外部_PaaS_PostgreSQL)]
   API --> OS[(OCI_Object_Storage)]
   OCIR[OCIR] -.->|docker_pull| Nginx
   OCIR -.->|docker_pull| API
 ```
 
-- ブラウザ → Load Balancer → fe-vm（Docker: nginx + frontend）→ api-vm（Docker: api + postgres）→ Object Storage
+- ブラウザ → Load Balancer → app-vm（Docker: nginx + frontend + api）→ 外部 PostgreSQL / Object Storage
 - イベント詳細の他ユーザー更新は WebSocket（`/ws/events/{id}`）で配信
 
 ## 現状
@@ -128,7 +128,7 @@ cd frontend && npm test
 
 ## OCI インフラ先行取得
 
-Ampere VM / LB 等の在庫確保のため、アプリ完成前に Terraform でリソースを取得できます。  
+app-vm（E2.1.Micro）/ LB / Object Storage を、アプリ完成前に Terraform で取得できます。  
 手順は [infra/README.md](infra/README.md) を参照（recipe-app の `terraform.tfvars` を流用可）。
 
 ### プロトタイプの起動
@@ -143,4 +143,4 @@ python3 -m http.server 8765
 
 ## 初級（recipe-app）との関係
 
-初級は Ampere A1 在庫不足時 **E2.1.Micro（x86）1 台** で稼働している可能性が高く、本アプリ（Ampere A1 × 2 台）への **リソースの引き継ぎ（移行）ではない**。初級を `terraform destroy` するのは x86 枠の整理と、同時公開を避けるため。本アプリ用 Ampere VM は cron リトライで **別途新規取得** する（[07 §3.1](docs/07-architecture.md)）。
+初級も本アプリも **E2.1.Micro 1 台** 構成を想定しますが、**VM の引き継ぎ（移行）ではない**。初級を `terraform destroy` するのは x86 Micro 枠（最大 2 台）の整理と、同時公開を避けるため。本アプリ用 app-vm は **別途新規作成** し、DB は外部 PaaS を使います（[07 §3.1](docs/07-architecture.md)）。

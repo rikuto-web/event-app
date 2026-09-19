@@ -63,36 +63,22 @@ variable "availability_domain" {
 
 variable "compute_shape" {
   type    = string
-  default = "VM.Standard.A1.Flex"
+  default = "VM.Standard.E2.1.Micro"
 }
 
-variable "fe_ocpus" {
-  type    = number
-  default = 1
+variable "app_ocpus" {
+  description = "Used only for Flex shapes."
+  type        = number
+  default     = 1
 }
 
-variable "fe_memory_in_gbs" {
-  type    = number
-  default = 3
-}
-
-variable "api_ocpus" {
-  type    = number
-  default = 1
-}
-
-variable "api_memory_in_gbs" {
-  type    = number
-  default = 3
+variable "app_memory_in_gbs" {
+  description = "Used only for Flex shapes."
+  type        = number
+  default     = 1
 }
 
 variable "images_bucket_name" {
   type    = string
   default = "event-app-images-prod"
-}
-
-variable "enable_fe_vm" {
-  description = "Create fe-vm and attach it to the load balancer. false = api-vm only (phase 1)."
-  type        = bool
-  default     = false
 }
