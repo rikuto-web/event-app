@@ -1,35 +1,54 @@
 # OCI インフラ先行取得
 
 本番相当リソース（VM / LB / Object Storage / OCIR）を **アプリデプロイ前に確保** する手順です。  
-デプロイ時の調整（HTTPS 証明書、nginx 設定、compose 起動）は VS-11 以降で行います。
+デプロイ時の調整（HTTPS 証明書、nginx 設定、compose 起動、外部 DB 接続）は VS-11 以降で行います。
 
 参照: [07 アーキテクチャ §3–§6](../../docs/07-architecture.md) / Issue [#15 VS-12](https://github.com/rikuto-web/event-app/issues/15)
 
-## 取得するリソース（今回）
+## 構成（2026-09 改定）
+
+Ampere A1 Flex の大阪在庫不足（`Out of host capacity`）を受け、**1 台 Micro + 外部 PostgreSQL** に変更しました。
+
+| リソース | 内容 | AWS 相当 |
+| --- | --- | --- |
+| Compartment | `event-event-app` | — |
+| app-vm | **E2.1.Micro**（x86, 1 GB）— Docker ホスト 1 台 | EC2 |
+| Load Balancer | Flexible LB、HTTP :80（HTTPS はデプロイ時） | ALB |
+| Object Storage | `event-app-images-prod` | S3 |
+| PostgreSQL | **外部 PaaS**（Neon / Supabase 等）— Terraform 管理外 | RDS |
+| OCIR | `event-frontend`, `event-api`, `event-nginx`（**Console 手動**。Terraform API は Free Tier で 403） | ECR |
+
+app-vm 上の Docker Compose:
+
+```
+app-vm（E2.1.Micro）
+├── nginx コンテナ   ← LB バックエンド :80
+├── frontend コンテナ
+└── api コンテナ     ← 外部 PostgreSQL へ接続（VM 内に postgres コンテナなし）
+```
+
+## 取得するリソース（Terraform）
 
 | リソース | 内容 |
 | --- | --- |
 | Compartment | `event-event-app` |
-| api-vm | Ampere A1 Flex 1 OCPU / 3 GB（**Phase 1: 先に取得**） |
-| fe-vm | Ampere A1 Flex 1 OCPU / 3 GB（**Phase 2: api-vm 取得後**） |
-| Load Balancer | Flexible LB、HTTP :80（HTTPS はデプロイ時） |
+| VCN / Subnet / NSG | 10.1.0.0/16 |
+| app-vm | E2.1.Micro |
+| Load Balancer | app-vm :80 へ転送 |
 | Object Storage | `event-app-images-prod` |
-| OCIR | `event-frontend`, `event-api`, `event-nginx`（**Console 手動**。Terraform API は Free Tier で 403） |
 
-### VM の段階取得（在庫不足対策）
+### リトライ（任意）
 
-Ampere A1 は在庫が少なく、2 台同時作成は `Out of host capacity` になりやすいです。  
-**api-vm → fe-vm の順で 1 台ずつ** apply します（cron / retry スクリプトが自動で段階を切り替え）。
+E2.1.Micro は Ampere より在庫が取りやすいため、通常は **1 回の `terraform apply` で足ります**。  
+失敗時のみ launchd / 手動リトライを使います。
 
-| Phase | 内容 | `enable_fe_vm` |
-| --- | --- | --- |
-| 1 | api-vm のみ | `false`（デフォルト） |
-| 2 | fe-vm + LB backend | `true`（api-vm が state にあるとき自動） |
+Mac の **cron は分単位が最小** のため、秒単位リトライは **launchd**（`setup-cron.sh`）。デフォルト **30 秒** 間隔。
 
 ## デプロイ時に調整するもの（後回しで OK）
 
 - LB への HTTPS :443 リスナーと証明書
-- fe-vm nginx 設定（`/api` `/ws` プロキシ）
+- app-vm nginx 設定（`/api` `/ws` プロキシ — 同一 VM 内の api コンテナへ）
+- 外部 PostgreSQL の接続文字列（`.env` / api コンテナ環境変数）
 - OCIR へのイメージ push / compose up
 - LB ヘルスチェック URL（`/health`）の HTTP 化
 
@@ -37,7 +56,7 @@ Ampere A1 は在庫が少なく、2 台同時作成は `Out of host capacity` �
 
 ## Step 0: recipe-app の削除（任意・推奨）
 
-同時常時公開を避けるため、初級 recipe-app を destroy します。
+同時常時公開を避けるため、初級 recipe-app を destroy します。Micro 枠（最大 2 台）も空きます。
 
 ```bash
 cd ../recipe-app/infra/terraform/environments/beginner
@@ -63,7 +82,7 @@ cp ../../../../../recipe-app/infra/terraform/environments/beginner/terraform.tfv
 | 変数 | 値 |
 | --- | --- |
 | `project_prefix` | `event` |
-| `compute_shape` | `VM.Standard.A1.Flex` |
+| `compute_shape` | `VM.Standard.E2.1.Micro` |
 | `vcn_cidr` | `10.1.0.0/16` |
 | `subnet_cidr` | `10.1.0.0/24` |
 | `dns_label` | `eventint` |
@@ -81,38 +100,57 @@ terraform plan
 terraform apply
 ```
 
-在庫不足（`Out of host capacity`）時:
+apply 失敗時:
 
 ```bash
-# 手動リトライ（段階的: api-vm → fe-vm）
+# 手動リトライ
 bash infra/deploy/retry-apply.sh
 
-# Mac cron（5 分ごと・段階を自動切替・既存 event-oci エントリは上書き）
+# Mac launchd（秒単位・デフォルト 30 秒）
 bash infra/deploy/setup-cron.sh
 
-# cron 解除
+# 間隔変更例（15 秒以上）
+INTERVAL_SECONDS=45 bash infra/deploy/setup-cron.sh
+
+# 解除（cron / launchd 両方）
 bash infra/deploy/remove-cron.sh
 ```
 
-ログは **実行のたびに上書き**（`~/Library/Logs/event-oci-hourly-retry.log`）。過去 run の蓄積はしない。
+**Ampere 用 launchd がまだ動いている場合**（旧構成）は、apply 前に解除してください:
+
+```bash
+bash infra/deploy/remove-cron.sh
+```
+
+ログ:
+
+- 詳細: `~/Library/Logs/event-oci-hourly-retry.log`（**最新 1 回分を上書き**）
+- 履歴: `~/Library/Logs/event-oci-hourly-retry.history.log`（**1 行サマリを追記**）
+
+```bash
+tail -20 ~/Library/Logs/event-oci-hourly-retry.history.log
+```
 
 ## Step 3: 確認
 
 ```bash
 terraform output
-# fe_vm_public_ip / api_vm_private_ip / load_balancer_public_ip
+# app_vm_public_ip / app_vm_private_ip / load_balancer_public_ip
 
-ssh -i ~/.ssh/id_ed25519 opc@$(terraform output -raw fe_vm_public_ip)
+ssh -i ~/.ssh/id_ed25519 opc@$(terraform output -raw app_vm_public_ip)
 ```
 
 ## Step 4: VM 最小初期化（任意・デプロイ前）
 
 ```bash
-# fe-vm / api-vm それぞれ
 sudo dnf install -y docker docker-compose-plugin
 sudo systemctl enable --now docker
 sudo usermod -aG docker opc
 ```
+
+## Step 5: 外部 PostgreSQL（Terraform 外）
+
+Neon / Supabase 等で PostgreSQL を作成し、接続 URL を api コンテナの `DATABASE_URL` に設定します（VS-11 デプロイ時）。
 
 ---
 
@@ -126,6 +164,8 @@ infra/
 └── deploy/
     ├── hourly-cron-apply.sh
     ├── retry-apply.sh
+    ├── setup-cron.sh
+    ├── remove-cron.sh
     └── deploy.sh          # VS-11 以降
 ```
 

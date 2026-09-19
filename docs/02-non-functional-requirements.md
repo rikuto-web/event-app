@@ -5,9 +5,9 @@
 | 項目 | 開発 | 本番 |
 | --- | --- | --- |
 | フロントエンド | `http://localhost:5173` | Load Balancer 経由 HTTPS |
-| API | `http://localhost:8080` | fe-vm nginx コンテナから `/api` プロキシ |
+| API | `http://localhost:8080` | app-vm nginx コンテナから `/api` プロキシ |
 | WebSocket | `ws://localhost:8080/ws/...` | `wss://`（LB 経由） |
-| PostgreSQL | Docker Compose 内 | api-vm 上の postgres コンテナ |
+| PostgreSQL | Docker Compose 内 | 外部 PaaS（Neon / Supabase 等） |
 | Object Storage | MinIO（Compose 任意） or OCI 開発バケット | OCI Object Storage（`ap-osaka-1`） |
 | リージョン | — | OCI ホームリージョン `ap-osaka-1`（大阪） |
 
@@ -26,10 +26,10 @@ Always Free の小さい VM を前提とし、過度なスケール要件は設�
 
 | 項目 | 方針 |
 | --- | --- |
-| 待機系 | なし（Always Free 単一 api-vm） |
+| 待機系 | なし（Always Free 単一 app-vm） |
 | LB | OCI Flexible Load Balancer（Always Free 1 基）で SSL 終端 |
 | 計画停止 | メンテ時は事前に利用者へ周知（提出デモ以外） |
-| 大阪容量不足 | cron による `terraform apply` リトライでインスタンス確保（[07](07-architecture.md)） |
+| VM 取得失敗 | launchd / 手動 `terraform apply` リトライ（[07](07-architecture.md)） |
 
 ## 4. セキュリティ
 
@@ -42,7 +42,7 @@ Always Free の小さい VM を前提とし、過度なスケール要件は設�
 | CORS（開発） | `http://localhost:5173` のみ許可 |
 | CORS（本番） | 同一オリジン（nginx プロキシ）のため不要 |
 | SSH | 管理者 IP のみ NSG で許可 |
-| api-vm 8080 | fe-vm / LB からのみ NSG 許可 |
+| app-vm 8080 | Compose 内部（nginx → api）のみ。外部公開しない |
 | SQL インジェクション | SQLAlchemy パラメータバインド。生文字列結合禁止 |
 | XSS | SolidJS のテキストエスケープ。`innerHTML` 不使用 |
 | HTTPS | 本番は LB で TLS 終端（Let's Encrypt または OCI 証明書） |
@@ -67,7 +67,7 @@ Always Free の小さい VM を前提とし、過度なスケール要件は設�
 | プロセス管理 | Docker Compose（本番 VM 上）。VM 再起動時は compose がコンテナを復帰 |
 | デプロイ | イメージ build → OCIR push → VM で `docker compose pull && up -d` |
 | 監視 | コンテナログ（`docker compose logs`）、nginx アクセスログ |
-| バックアップ | postgres コンテナから `pg_dump` → Object Storage の別 prefix へ |
+| バックアップ | PaaS 側の自動バックアップ + 必要時 `pg_dump` → Object Storage |
 
 ## 7. 文字コード・JSON・日時
 
@@ -78,14 +78,14 @@ Always Free の小さい VM を前提とし、過度なスケール要件は設�
 | 日時 API | ISO 8601 UTC（`2026-09-01T12:00:00Z`） |
 | 日時 UI | ユーザーのローカルタイムゾーンで表示 |
 
-| 初級環境削除 | （任意）recipe-app destroy。Ampere 取得とは別問題（[07 §3.1](07-architecture.md)） |
+| 初級環境削除 | （任意）recipe-app destroy — Micro 枠の整理（[07 §3.1](07-architecture.md)） |
 
 ## 8. Docker / コンテナ
 
 | 環境 | Docker |
 | --- | --- |
 | ローカル開発 | **標準**。`docker compose up` で FE / API / PostgreSQL を起動 |
-| 本番（OCI） | **標準**。fe-vm / api-vm 上で Docker Compose によりコンテナ起動 |
+| 本番（OCI） | **標準**。app-vm 上で Docker Compose によりコンテナ起動 |
 | レジストリ | OCI Container Registry（OCIR）。本番イメージは OCIR 経由で配布 |
 
 VM は Docker ホストとして最小構成（Docker Engine + Compose）のみ載せ、アプリはすべてコンテナ内で動作させる。

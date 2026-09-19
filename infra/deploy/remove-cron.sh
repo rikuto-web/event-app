@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Mac 上で event-oci-hourly-retry cron を削除。
+# Mac 上で event-oci リトライ（cron / launchd）を削除。
 set -euo pipefail
 
-MARKER="event-oci-hourly-retry"
-TMP="$(mktemp)"
-if crontab -l 2>/dev/null | grep -v "$MARKER" >"$TMP"; then
-  crontab "$TMP"
-fi
-rm -f "$TMP"
-echo "Removed cron entries matching $MARKER"
+DEPLOY_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# shellcheck source=lib/scheduler.sh
+source "$DEPLOY_DIR/lib/scheduler.sh"
+
+remove_retry_scheduler
+echo "Removed retry scheduler ($SCHEDULER_MARKER / $SCHEDULER_LABEL)"

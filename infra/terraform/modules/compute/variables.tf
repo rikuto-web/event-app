@@ -19,9 +19,9 @@ variable "display_name" {
 }
 
 variable "shape" {
-  description = "Compute shape (e.g. VM.Standard.A1.Flex)."
+  description = "Compute shape (e.g. VM.Standard.E2.1.Micro)."
   type        = string
-  default     = "VM.Standard.A1.Flex"
+  default     = "VM.Standard.E2.1.Micro"
 }
 
 variable "ocpus" {
