@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.security import hash_password
 from app.db.session import get_db
 from app.main import app
-from app.models import Event, EventMember, EventParticipation, User
+from app.models import Event, EventComment, EventMember, EventParticipation, User
 
 TEST_ALICE_EMAIL = "vs02-test-alice@example.com"
 TEST_BOB_EMAIL = "vs02-test-bob@example.com"
@@ -180,6 +180,22 @@ def sample_events(db: Session) -> dict[str, object]:
 
     db.add(EventParticipation(event_id=owned.id, user_id=alice.id, status="going"))
     db.add(EventParticipation(event_id=owned.id, user_id=bob.id, status="maybe"))
+    db.add(
+        EventComment(
+            event_id=owned.id,
+            author_id=alice.id,
+            body="See you there",
+            created_at=datetime(2026, 9, 9, 8, 0, tzinfo=UTC),
+        )
+    )
+    db.add(
+        EventComment(
+            event_id=owned.id,
+            author_id=alice.id,
+            body="Bring your laptop",
+            created_at=datetime(2026, 9, 9, 9, 0, tzinfo=UTC),
+        )
+    )
     db.flush()
 
     return {
