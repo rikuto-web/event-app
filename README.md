@@ -85,11 +85,27 @@ flowchart TB
 
 ## 現状
 
-- **VS-00 Walking Skeleton** — `backend/` + `frontend/` 骨格、health API、Alembic 初回マイグレーション、AppShell
+- **VS-00〜VS-04** — 認証、イベント一覧・作成・詳細
+- **VS-05〜VS-10** — 編集、WebSocket、削除、メンバー、コメント、RSVP、画像アップロード
+- **VS-11** — Docker Compose 開発環境（`docker compose up --build`）
 - **設計ドキュメント**（`docs/01`〜`08`）
 - **HTML/CSS/JS プロトタイプ**（`prototype/`）— UX 検証用。Docs と矛盾する場合は **プロトタイプを正** とする（一覧 UI・作成モーダル等）
 
-## ローカル開発（VS-00）
+## ローカル開発（Docker Compose — 推奨）
+
+```bash
+docker compose up --build
+```
+
+| サービス | URL |
+| --- | --- |
+| フロントエンド | http://localhost:5173 |
+| API | http://localhost:8080/api/v1/health |
+| MinIO コンソール | http://localhost:9001（minioadmin / minioadmin） |
+
+起動時に Alembic マイグレーションが自動実行されます。
+
+## ローカル開発（個別起動）
 
 ### 前提
 

@@ -49,6 +49,20 @@ class EventCreateRequest(BaseModel):
         return self
 
 
+class EventUpdateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=100)
+    description: str | None = None
+    starts_at: datetime
+    ends_at: datetime
+    location: str | None = Field(default=None, max_length=200)
+
+    @model_validator(mode="after")
+    def validate_datetime_range(self) -> Self:
+        if self.ends_at < self.starts_at:
+            raise ValueError("ends_at must be on or after starts_at")
+        return self
+
+
 class EventDetailResponse(BaseModel):
     id: UUID
     title: str
@@ -56,8 +70,11 @@ class EventDetailResponse(BaseModel):
     starts_at: datetime
     ends_at: datetime
     location: str | None
+    image_url: str | None = None
     my_role: str
+    my_participation: str | None = None
     participation_summary: ParticipationSummary
+    updated_at: datetime | None = None
 
 
 class EventMemberUser(BaseModel):
@@ -92,3 +109,24 @@ class EventCommentItem(BaseModel):
 class EventCommentsResponse(BaseModel):
     items: list[EventCommentItem]
     total: int
+
+
+class EventMemberInviteRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    role: str = Field(pattern="^(editor|viewer)$")
+
+
+class EventMemberRoleUpdateRequest(BaseModel):
+    role: str = Field(pattern="^(editor|viewer)$")
+
+
+class EventCommentCreateRequest(BaseModel):
+    body: str = Field(min_length=1, max_length=500)
+
+
+class EventCommentUpdateRequest(BaseModel):
+    body: str = Field(min_length=1, max_length=500)
+
+
+class EventParticipationUpdateRequest(BaseModel):
+    status: str = Field(pattern="^(going|maybe|not_going)$")

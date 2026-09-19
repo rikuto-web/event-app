@@ -250,3 +250,139 @@ class EventRepository:
             )
             for comment_id, body, author_id, author_display_name, created_at in rows
         ]
+
+    def get_member_role(self, user_id: UUID, event_id: UUID) -> str | None:
+        stmt = select(EventMember.role).where(
+            EventMember.user_id == user_id,
+            EventMember.event_id == event_id,
+        )
+        return self.db.execute(stmt).scalar_one_or_none()
+
+    def get_event(self, event_id: UUID) -> Event | None:
+        return self.db.get(Event, event_id)
+
+    def update_event(
+        self,
+        event_id: UUID,
+        *,
+        title: str,
+        description: str | None,
+        starts_at: datetime,
+        ends_at: datetime,
+        location: str | None,
+    ) -> Event | None:
+        event = self.db.get(Event, event_id)
+        if event is None:
+            return None
+        event.title = title
+        event.description = description
+        event.starts_at = starts_at
+        event.ends_at = ends_at
+        event.location = location
+        self.db.commit()
+        self.db.refresh(event)
+        return event
+
+    def delete_event(self, event_id: UUID) -> bool:
+        event = self.db.get(Event, event_id)
+        if event is None:
+            return False
+        self.db.delete(event)
+        self.db.commit()
+        return True
+
+    def add_member(self, event_id: UUID, user_id: UUID, role: str) -> EventMember:
+        member = EventMember(event_id=event_id, user_id=user_id, role=role)
+        self.db.add(member)
+        self.db.commit()
+        self.db.refresh(member)
+        return member
+
+    def member_exists(self, event_id: UUID, user_id: UUID) -> bool:
+        stmt = select(EventMember.id).where(
+            EventMember.event_id == event_id,
+            EventMember.user_id == user_id,
+        )
+        return self.db.execute(stmt).scalar_one_or_none() is not None
+
+    def update_member_role(self, event_id: UUID, user_id: UUID, role: str) -> bool:
+        stmt = select(EventMember).where(
+            EventMember.event_id == event_id,
+            EventMember.user_id == user_id,
+        )
+        member = self.db.execute(stmt).scalar_one_or_none()
+        if member is None:
+            return False
+        member.role = role
+        self.db.commit()
+        return True
+
+    def remove_member(self, event_id: UUID, user_id: UUID) -> bool:
+        stmt = select(EventMember).where(
+            EventMember.event_id == event_id,
+            EventMember.user_id == user_id,
+        )
+        member = self.db.execute(stmt).scalar_one_or_none()
+        if member is None:
+            return False
+        self.db.delete(member)
+        self.db.commit()
+        return True
+
+    def create_comment(self, event_id: UUID, author_id: UUID, body: str) -> EventComment:
+        comment = EventComment(event_id=event_id, author_id=author_id, body=body)
+        self.db.add(comment)
+        self.db.commit()
+        self.db.refresh(comment)
+        return comment
+
+    def get_comment(self, comment_id: UUID) -> EventComment | None:
+        return self.db.get(EventComment, comment_id)
+
+    def update_comment(self, comment_id: UUID, body: str) -> EventComment | None:
+        comment = self.db.get(EventComment, comment_id)
+        if comment is None:
+            return None
+        comment.body = body
+        self.db.commit()
+        self.db.refresh(comment)
+        return comment
+
+    def delete_comment(self, comment_id: UUID) -> bool:
+        comment = self.db.get(EventComment, comment_id)
+        if comment is None:
+            return False
+        self.db.delete(comment)
+        self.db.commit()
+        return True
+
+    def get_participation_status(self, event_id: UUID, user_id: UUID) -> str | None:
+        stmt = select(EventParticipation.status).where(
+            EventParticipation.event_id == event_id,
+            EventParticipation.user_id == user_id,
+        )
+        return self.db.execute(stmt).scalar_one_or_none()
+
+    def upsert_participation(self, event_id: UUID, user_id: UUID, status: str) -> EventParticipation:
+        stmt = select(EventParticipation).where(
+            EventParticipation.event_id == event_id,
+            EventParticipation.user_id == user_id,
+        )
+        participation = self.db.execute(stmt).scalar_one_or_none()
+        if participation is None:
+            participation = EventParticipation(event_id=event_id, user_id=user_id, status=status)
+            self.db.add(participation)
+        else:
+            participation.status = status
+        self.db.commit()
+        self.db.refresh(participation)
+        return participation
+
+    def update_image_key(self, event_id: UUID, object_key: str) -> Event | None:
+        event = self.db.get(Event, event_id)
+        if event is None:
+            return None
+        event.image_object_key = object_key
+        self.db.commit()
+        self.db.refresh(event)
+        return event
