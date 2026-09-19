@@ -57,3 +57,38 @@ class EventDetailResponse(BaseModel):
     ends_at: datetime
     location: str | None
     my_role: str
+    participation_summary: ParticipationSummary
+
+
+class EventMemberUser(BaseModel):
+    id: UUID
+    email: str
+    display_name: str
+
+
+class EventMemberItem(BaseModel):
+    user_id: UUID
+    role: str
+    user: EventMemberUser
+
+
+class EventMembersResponse(BaseModel):
+    items: list[EventMemberItem]
+    total: int
+
+
+class EventCommentAuthor(BaseModel):
+    id: UUID
+    display_name: str
+
+
+class EventCommentItem(BaseModel):
+    id: UUID
+    body: str
+    author: EventCommentAuthor
+    created_at: datetime
+
+
+class EventCommentsResponse(BaseModel):
+    items: list[EventCommentItem]
+    total: int

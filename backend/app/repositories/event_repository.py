@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy import Select, and_, case, func, select
 from sqlalchemy.orm import Session
 
-from app.models import Event, EventMember, EventParticipation
+from app.models import Event, EventComment, EventMember, EventParticipation, User
 
 
 @dataclass(frozen=True)
@@ -17,20 +17,38 @@ class EventListRow:
     not_going: int
 
 
+@dataclass(frozen=True)
+class EventDetailRow:
+    event: Event
+    my_role: str
+    going: int
+    maybe: int
+    not_going: int
+
+
+@dataclass(frozen=True)
+class EventMemberRow:
+    user_id: UUID
+    role: str
+    email: str
+    display_name: str
+
+
+@dataclass(frozen=True)
+class EventCommentRow:
+    id: UUID
+    body: str
+    author_id: UUID
+    author_display_name: str
+    created_at: datetime
+
+
 class EventRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def list_for_user(
-        self,
-        user_id: UUID,
-        *,
-        role: str | None = None,
-        from_date: date | None = None,
-        to_date: date | None = None,
-        sort: str = "starts_at_asc",
-    ) -> list[EventListRow]:
-        participation_subq = (
+    def _participation_subquery(self):
+        return (
             select(
                 EventParticipation.event_id.label("event_id"),
                 func.coalesce(
@@ -49,6 +67,17 @@ class EventRepository:
             .group_by(EventParticipation.event_id)
             .subquery()
         )
+
+    def list_for_user(
+        self,
+        user_id: UUID,
+        *,
+        role: str | None = None,
+        from_date: date | None = None,
+        to_date: date | None = None,
+        sort: str = "starts_at_asc",
+    ) -> list[EventListRow]:
+        participation_subq = self._participation_subquery()
 
         membership = (
             select(EventMember)
@@ -103,7 +132,7 @@ class EventRepository:
                 going=int(going),
                 maybe=int(maybe),
                 not_going=int(not_going),
-                )
+            )
             for event, my_role, going, maybe, not_going in rows
         ]
 
@@ -131,3 +160,93 @@ class EventRepository:
         self.db.commit()
         self.db.refresh(event)
         return event
+
+    def get_for_member(self, user_id: UUID, event_id: UUID) -> EventDetailRow | None:
+        participation_subq = self._participation_subquery()
+        membership = (
+            select(EventMember)
+            .where(EventMember.user_id == user_id, EventMember.event_id == event_id)
+            .subquery()
+        )
+
+        stmt = (
+            select(
+                Event,
+                membership.c.role,
+                func.coalesce(participation_subq.c.going, 0),
+                func.coalesce(participation_subq.c.maybe, 0),
+                func.coalesce(participation_subq.c.not_going, 0),
+            )
+            .join(membership, membership.c.event_id == Event.id)
+            .outerjoin(participation_subq, participation_subq.c.event_id == Event.id)
+            .where(Event.id == event_id)
+        )
+
+        row = self.db.execute(stmt).one_or_none()
+        if row is None:
+            return None
+
+        event, my_role, going, maybe, not_going = row
+        return EventDetailRow(
+            event=event,
+            my_role=my_role,
+            going=int(going),
+            maybe=int(maybe),
+            not_going=int(not_going),
+        )
+
+    def is_member(self, user_id: UUID, event_id: UUID) -> bool:
+        stmt = select(EventMember.id).where(
+            EventMember.user_id == user_id,
+            EventMember.event_id == event_id,
+        )
+        return self.db.execute(stmt).scalar_one_or_none() is not None
+
+    def list_members(self, event_id: UUID) -> list[EventMemberRow]:
+        stmt = (
+            select(
+                EventMember.user_id,
+                EventMember.role,
+                User.email,
+                User.display_name,
+            )
+            .join(User, User.id == EventMember.user_id)
+            .where(EventMember.event_id == event_id)
+            .order_by(EventMember.created_at.asc())
+        )
+        rows = self.db.execute(stmt).all()
+        return [
+            EventMemberRow(
+                user_id=user_id,
+                role=role,
+                email=email,
+                display_name=display_name,
+            )
+            for user_id, role, email, display_name in rows
+        ]
+
+    def list_comments(self, event_id: UUID, *, limit: int = 50) -> list[EventCommentRow]:
+        stmt = (
+            select(
+                EventComment.id,
+                EventComment.body,
+                User.id,
+                User.display_name,
+                EventComment.created_at,
+            )
+            .join(User, User.id == EventComment.author_id)
+            .where(EventComment.event_id == event_id)
+            .order_by(EventComment.created_at.asc())
+            .limit(limit)
+        )
+        rows = self.db.execute(stmt).all()
+        return [
+            EventCommentRow(
+                id=comment_id,
+                body=body,
+                author_id=author_id,
+                author_display_name=author_display_name,
+                created_at=created_at,
+            )
+            for comment_id, body, author_id, author_display_name, created_at in rows
+        ]

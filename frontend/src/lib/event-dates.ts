@@ -125,6 +125,22 @@ export function formatEventTime(value: string): string {
   });
 }
 
+export function formatEventDateRange(startsAt: string, endsAt: string): string {
+  const dateOpts: Intl.DateTimeFormatOptions = {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  };
+  const timeOpts: Intl.DateTimeFormatOptions = {
+    hour: "2-digit",
+    minute: "2-digit",
+  };
+  const start = new Date(startsAt);
+  const end = new Date(endsAt);
+  return `${start.toLocaleString("ja-JP", dateOpts)} 〜 ${end.toLocaleString("ja-JP", timeOpts)}`;
+}
+
 export const HOUR_PX = 48;
 
 export function defaultRangeForDay(year: number, month: number, day: number): {

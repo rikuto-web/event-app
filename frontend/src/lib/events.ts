@@ -36,6 +36,41 @@ export type EventDetail = {
   ends_at: string;
   location: string | null;
   my_role: "owner" | "editor" | "viewer";
+  participation_summary: ParticipationSummary;
+};
+
+export type EventMemberUser = {
+  id: string;
+  email: string;
+  display_name: string;
+};
+
+export type EventMemberItem = {
+  user_id: string;
+  role: "owner" | "editor" | "viewer";
+  user: EventMemberUser;
+};
+
+export type EventMembersResponse = {
+  items: EventMemberItem[];
+  total: number;
+};
+
+export type EventCommentAuthor = {
+  id: string;
+  display_name: string;
+};
+
+export type EventCommentItem = {
+  id: string;
+  body: string;
+  author: EventCommentAuthor;
+  created_at: string;
+};
+
+export type EventCommentsResponse = {
+  items: EventCommentItem[];
+  total: number;
 };
 
 export type CreateEventPayload = {
@@ -62,4 +97,28 @@ export async function createEvent(payload: CreateEventPayload): Promise<EventDet
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function fetchEventDetail(eventId: string): Promise<EventDetail> {
+  return fetchJson<EventDetail>(`/events/${eventId}`);
+}
+
+export async function fetchEventMembers(eventId: string): Promise<EventMembersResponse> {
+  return fetchJson<EventMembersResponse>(`/events/${eventId}/members`);
+}
+
+export async function fetchEventComments(eventId: string): Promise<EventCommentsResponse> {
+  return fetchJson<EventCommentsResponse>(`/events/${eventId}/comments`);
+}
+
+export function canEditEvent(role: EventDetail["my_role"]): boolean {
+  return role === "owner" || role === "editor";
+}
+
+export function canDeleteEvent(role: EventDetail["my_role"]): boolean {
+  return role === "owner";
+}
+
+export function canInviteMembers(role: EventDetail["my_role"]): boolean {
+  return role === "owner";
 }
