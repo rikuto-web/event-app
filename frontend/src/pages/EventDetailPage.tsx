@@ -1,6 +1,7 @@
 import { A, useParams } from "@solidjs/router";
-import { For, Show, createResource, type Component } from "solid-js";
+import { For, Show, createEffect, createResource, createSignal, type Component } from "solid-js";
 import { formatEventDateRange } from "../lib/event-dates";
+import { connectEventWebSocket, type EventWsMessage } from "../lib/event-websocket";
 import {
   canDeleteEvent,
   canEditEvent,
@@ -14,12 +15,39 @@ export const EventDetailPage: Component = () => {
   const params = useParams<{ eventId: string }>();
   const eventId = () => params.eventId;
 
-  const [detail] = createResource(eventId, fetchEventDetail);
+  const [detail, { mutate: mutateDetail }] = createResource(eventId, fetchEventDetail);
   const [members] = createResource(eventId, fetchEventMembers);
   const [comments] = createResource(eventId, fetchEventComments);
+  const [wsConnected, setWsConnected] = createSignal(false);
 
   const isLoading = () => detail.loading || members.loading || comments.loading;
   const loadError = () => detail.error ?? members.error ?? comments.error;
+
+  const applyWsMessage = (message: EventWsMessage) => {
+    if (message.type !== "event.updated") return;
+    mutateDetail((current) =>
+      current
+        ? {
+            ...current,
+            title: message.payload.title ?? current.title,
+            description: message.payload.description ?? current.description,
+            starts_at: message.payload.starts_at ?? current.starts_at,
+            ends_at: message.payload.ends_at ?? current.ends_at,
+            location: message.payload.location ?? current.location,
+            updated_at: message.payload.updated_at ?? current.updated_at,
+          }
+        : current,
+    );
+  };
+
+  createEffect(() => {
+    const id = eventId();
+    return connectEventWebSocket({
+      eventId: id,
+      onMessage: applyWsMessage,
+      onConnectionChange: setWsConnected,
+    });
+  });
 
   return (
     <section class="event-detail">
@@ -42,9 +70,9 @@ export const EventDetailPage: Component = () => {
               <h1>{event().title}</h1>
               <div class="detail-actions">
                 <Show when={canEditEvent(event().my_role)}>
-                  <button type="button" class="btn btn-ghost btn-sm" disabled>
+                  <A href={`/events/${event().id}/edit`} class="btn btn-ghost btn-sm">
                     編集
-                  </button>
+                  </A>
                 </Show>
                 <Show when={canDeleteEvent(event().my_role)}>
                   <button type="button" class="btn btn-danger btn-sm" disabled>
@@ -52,6 +80,11 @@ export const EventDetailPage: Component = () => {
                   </button>
                 </Show>
               </div>
+            </div>
+
+            <div class="live-bar">
+              <span class={`live-dot ${wsConnected() ? "" : "disconnected"}`} />
+              <span>{wsConnected() ? "リアルタイム接続中" : "オフライン — 再接続中…"}</span>
             </div>
 
             <dl class="detail-meta">

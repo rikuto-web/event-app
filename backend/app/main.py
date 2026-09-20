@@ -13,6 +13,7 @@ from app.core.config import get_settings
 from app.core.exceptions import AppError
 from app.core.logging import configure_logging
 from app.schemas.error import ErrorResponseSchema
+from app.ws.router import router as ws_router
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(v1_router, prefix="/api/v1")
+    app.include_router(ws_router)
 
     @app.middleware("http")
     async def logging_middleware(

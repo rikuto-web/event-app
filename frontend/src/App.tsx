@@ -11,6 +11,7 @@ import {
   logout,
 } from "./lib/auth";
 import { EventDetailPage } from "./pages/EventDetailPage";
+import { EventEditPage } from "./pages/EventEditPage";
 import { EventsPage } from "./pages/EventsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
@@ -78,6 +79,16 @@ const App: Component = () => {
       <Route
         path="/events/new"
         component={() => <Navigate href="/events?create=1" />}
+      />
+      <Route
+        path="/events/:eventId/edit"
+        component={() => (
+          <RequireAuth>
+            <AuthenticatedLayout>
+              <EventEditPage />
+            </AuthenticatedLayout>
+          </RequireAuth>
+        )}
       />
       <Route
         path="/events/:eventId"

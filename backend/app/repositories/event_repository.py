@@ -250,3 +250,32 @@ class EventRepository:
             )
             for comment_id, body, author_id, author_display_name, created_at in rows
         ]
+
+    def get_member_role(self, user_id: UUID, event_id: UUID) -> str | None:
+        stmt = select(EventMember.role).where(
+            EventMember.user_id == user_id,
+            EventMember.event_id == event_id,
+        )
+        return self.db.execute(stmt).scalar_one_or_none()
+
+    def update_event(
+        self,
+        event_id: UUID,
+        *,
+        title: str,
+        description: str | None,
+        starts_at: datetime,
+        ends_at: datetime,
+        location: str | None,
+    ) -> Event | None:
+        event = self.db.get(Event, event_id)
+        if event is None:
+            return None
+        event.title = title
+        event.description = description
+        event.starts_at = starts_at
+        event.ends_at = ends_at
+        event.location = location
+        self.db.commit()
+        self.db.refresh(event)
+        return event

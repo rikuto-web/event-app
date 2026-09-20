@@ -874,6 +874,40 @@
   color: var(--muted);
 }
 
+.live-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.live-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.live-dot.disconnected {
+  background: var(--danger);
+}
+
+.page-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.5rem;
+}
+
+.subtitle {
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+
+.form-card {
+  max-width: 560px;
+}
+
 @media (max-width: 700px) {
   .calendar-day {
     min-height: 72px;

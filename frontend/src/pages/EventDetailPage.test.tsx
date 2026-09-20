@@ -66,11 +66,27 @@ function mockDetailApis(role: "owner" | "editor" | "viewer" = "owner") {
   });
 }
 
+class MockWebSocket {
+  static CONNECTING = 0;
+  static OPEN = 1;
+  static CLOSING = 2;
+  static CLOSED = 3;
+  readyState = MockWebSocket.OPEN;
+  onopen: (() => void) | null = null;
+  onclose: (() => void) | null = null;
+  constructor(_url: string) {
+    queueMicrotask(() => this.onopen?.());
+  }
+  close() {}
+  send() {}
+}
+
 describe("EventDetailPage", () => {
   beforeEach(() => {
     sessionStorage.clear();
     clearSession();
     vi.restoreAllMocks();
+    vi.stubGlobal("WebSocket", MockWebSocket);
     setTokens({
       access_token: "access-token",
       token_type: "bearer",
@@ -107,7 +123,7 @@ describe("EventDetailPage", () => {
       </Router>
     ));
 
-    expect(await screen.findByRole("button", { name: "編集" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "編集" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "削除" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "+ 招待" })).toBeInTheDocument();
   });
@@ -122,7 +138,7 @@ describe("EventDetailPage", () => {
       </Router>
     ));
 
-    expect(await screen.findByRole("button", { name: "編集" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "編集" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "削除" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "+ 招待" })).not.toBeInTheDocument();
   });
@@ -138,7 +154,7 @@ describe("EventDetailPage", () => {
     ));
 
     await screen.findByRole("heading", { name: "SolidJS 勉強会" });
-    expect(screen.queryByRole("button", { name: "編集" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "編集" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "削除" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "+ 招待" })).not.toBeInTheDocument();
   });

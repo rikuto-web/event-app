@@ -16,8 +16,10 @@ from app.schemas.event import (
     EventMemberItem,
     EventMemberUser,
     EventMembersResponse,
+    EventUpdateRequest,
     ParticipationSummary,
 )
+from app.ws.manager import ws_manager
 
 
 class EventService:
@@ -27,6 +29,20 @@ class EventService:
 
     def _event_not_found(self) -> AppError:
         return AppError(code="NOT_FOUND", message="イベントが見つかりません", status_code=404)
+
+    def _forbidden(self) -> AppError:
+        return AppError(code="FORBIDDEN", message="権限がありません", status_code=403)
+
+    def _require_editor(self, user_id: UUID, event_id: UUID) -> str:
+        role = self.events.get_member_role(user_id, event_id)
+        if role is None:
+            raise self._event_not_found()
+        if role not in ("owner", "editor"):
+            raise self._forbidden()
+        return role
+
+    async def _broadcast(self, event_id: UUID, message_type: str, payload: dict) -> None:
+        await ws_manager.broadcast(event_id, {"type": message_type, "payload": payload})
 
     def list_events(
         self,
@@ -80,6 +96,7 @@ class EventService:
             location=event.location,
             my_role="owner",
             participation_summary=ParticipationSummary(),
+            updated_at=event.updated_at,
         )
 
     def get_event(self, user_id: UUID, event_id: UUID) -> EventDetailResponse:
@@ -100,7 +117,37 @@ class EventService:
                 maybe=row.maybe,
                 not_going=row.not_going,
             ),
+            updated_at=row.event.updated_at,
         )
+
+    async def update_event(self, user_id: UUID, event_id: UUID, data: EventUpdateRequest) -> EventDetailResponse:
+        self._require_editor(user_id, event_id)
+        updated = self.events.update_event(
+            event_id,
+            title=data.title,
+            description=data.description,
+            starts_at=data.starts_at,
+            ends_at=data.ends_at,
+            location=data.location,
+        )
+        if updated is None:
+            raise self._event_not_found()
+
+        detail = self.get_event(user_id, event_id)
+        await self._broadcast(
+            event_id,
+            "event.updated",
+            {
+                "id": str(detail.id),
+                "title": detail.title,
+                "description": detail.description,
+                "starts_at": detail.starts_at.isoformat(),
+                "ends_at": detail.ends_at.isoformat(),
+                "location": detail.location,
+                "updated_at": detail.updated_at.isoformat() if detail.updated_at else None,
+            },
+        )
+        return detail
 
     def list_members(self, user_id: UUID, event_id: UUID) -> EventMembersResponse:
         if not self.events.is_member(user_id, event_id):
