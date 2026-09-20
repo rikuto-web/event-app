@@ -124,6 +124,28 @@ export async function fetchEventComments(eventId: string): Promise<EventComments
   return fetchJson<EventCommentsResponse>(`/events/${eventId}/comments`);
 }
 
+export async function createEventComment(eventId: string, body: string): Promise<EventCommentItem> {
+  return fetchJson<EventCommentItem>(`/events/${eventId}/comments`, {
+    method: "POST",
+    body: JSON.stringify({ body }),
+  });
+}
+
+export async function updateEventComment(
+  eventId: string,
+  commentId: string,
+  body: string,
+): Promise<EventCommentItem> {
+  return fetchJson<EventCommentItem>(`/events/${eventId}/comments/${commentId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ body }),
+  });
+}
+
+export async function deleteEventComment(eventId: string, commentId: string): Promise<void> {
+  return fetchJson<void>(`/events/${eventId}/comments/${commentId}`, { method: "DELETE" });
+}
+
 export function canEditEvent(role: EventDetail["my_role"]): boolean {
   return role === "owner" || role === "editor";
 }

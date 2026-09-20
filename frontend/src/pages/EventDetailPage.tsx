@@ -1,5 +1,6 @@
 import { A, useNavigate, useParams } from "@solidjs/router";
 import { For, Show, createEffect, createResource, createSignal, type Component } from "solid-js";
+import { getCurrentUser } from "../lib/auth";
 import { ApiError } from "../lib/api";
 import { formatEventDateRange } from "../lib/event-dates";
 import { connectEventWebSocket, type EventWsMessage } from "../lib/event-websocket";
@@ -9,8 +10,12 @@ import {
   canInviteMembers,
   canManageMember,
   deleteEvent,
+  createEventComment,
+  deleteEventComment,
   fetchEventComments,
   fetchEventDetail,
+  updateEventComment,
+  type EventCommentItem,
   fetchEventMembers,
   inviteEventMember,
   removeEventMember,
@@ -25,7 +30,7 @@ export const EventDetailPage: Component = () => {
 
   const [detail, { mutate: mutateDetail }] = createResource(eventId, fetchEventDetail);
   const [members, { mutate: mutateMembers }] = createResource(eventId, fetchEventMembers);
-  const [comments] = createResource(eventId, fetchEventComments);
+  const [comments, { mutate: mutateComments }] = createResource(eventId, fetchEventComments);
   const [wsConnected, setWsConnected] = createSignal(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
   const [isDeleting, setIsDeleting] = createSignal(false);
@@ -34,26 +39,103 @@ export const EventDetailPage: Component = () => {
   const [inviteEmail, setInviteEmail] = createSignal("");
   const [inviteRole, setInviteRole] = createSignal<"editor" | "viewer">("editor");
   const [inviteError, setInviteError] = createSignal("");
+  const [commentBody, setCommentBody] = createSignal("");
+  const [commentError, setCommentError] = createSignal("");
+  const [editingCommentId, setEditingCommentId] = createSignal<string | null>(null);
+  const [editingCommentBody, setEditingCommentBody] = createSignal("");
 
   const isLoading = () => detail.loading || members.loading || comments.loading;
   const loadError = () => detail.error ?? members.error ?? comments.error;
 
   const applyWsMessage = (message: EventWsMessage) => {
-    if (message.type !== "event.updated") return;
-    mutateDetail((current) =>
-      current
-        ? {
-            ...current,
-            title: message.payload.title ?? current.title,
-            description: message.payload.description ?? current.description,
-            starts_at: message.payload.starts_at ?? current.starts_at,
-            ends_at: message.payload.ends_at ?? current.ends_at,
-            location: message.payload.location ?? current.location,
-            updated_at: message.payload.updated_at ?? current.updated_at,
-          }
-        : current,
-    );
+    if (message.type === "event.updated") {
+      mutateDetail((current) =>
+        current
+          ? {
+              ...current,
+              title: message.payload.title ?? current.title,
+              description: message.payload.description ?? current.description,
+              starts_at: message.payload.starts_at ?? current.starts_at,
+              ends_at: message.payload.ends_at ?? current.ends_at,
+              location: message.payload.location ?? current.location,
+              updated_at: message.payload.updated_at ?? current.updated_at,
+            }
+          : current,
+      );
+      return;
+    }
+    if (message.type === "comment.created") {
+      mutateComments((current) => {
+        if (!current) return current;
+        if (current.items.some((item) => item.id === message.payload.id)) return current;
+        const item: EventCommentItem = {
+          id: message.payload.id,
+          body: message.payload.body,
+          author: message.payload.author,
+          created_at: message.payload.created_at,
+        };
+        return { items: [...current.items, item], total: current.total + 1 };
+      });
+    }
   };
+
+  const handleCommentSubmit = async (event: Event) => {
+    event.preventDefault();
+    setCommentError("");
+    const body = commentBody().trim();
+    if (!body) {
+      setCommentError("コメントを入力してください");
+      return;
+    }
+    try {
+      const created = await createEventComment(eventId(), body);
+      mutateComments((current) =>
+        current
+          ? { items: [...current.items, created], total: current.total + 1 }
+          : { items: [created], total: 1 },
+      );
+      setCommentBody("");
+    } catch (error) {
+      setCommentError(error instanceof ApiError ? error.message : "送信に失敗しました");
+    }
+  };
+
+  const handleCommentEdit = async (commentId: string) => {
+    const body = editingCommentBody().trim();
+    if (!body) return;
+    try {
+      const updated = await updateEventComment(eventId(), commentId, body);
+      mutateComments((current) =>
+        current
+          ? {
+              items: current.items.map((item) => (item.id === commentId ? updated : item)),
+              total: current.total,
+            }
+          : current,
+      );
+      setEditingCommentId(null);
+    } catch (error) {
+      setCommentError(error instanceof ApiError ? error.message : "更新に失敗しました");
+    }
+  };
+
+  const handleCommentDelete = async (commentId: string) => {
+    try {
+      await deleteEventComment(eventId(), commentId);
+      mutateComments((current) =>
+        current
+          ? {
+              items: current.items.filter((item) => item.id !== commentId),
+              total: Math.max(0, current.total - 1),
+            }
+          : current,
+      );
+    } catch (error) {
+      setCommentError(error instanceof ApiError ? error.message : "削除に失敗しました");
+    }
+  };
+
+  const currentUserId = () => getCurrentUser()?.id;
 
   const handleInvite = async (event: Event) => {
     event.preventDefault();
@@ -239,12 +321,61 @@ export const EventDetailPage: Component = () => {
                     {(comment) => (
                       <li class="comment-item">
                         <span class="comment-author">{comment.author.display_name}</span>
-                        <p class="comment-body">{comment.body}</p>
+                        <Show
+                          when={editingCommentId() === comment.id}
+                          fallback={<p class="comment-body">{comment.body}</p>}
+                        >
+                          <input
+                            class="auth-input"
+                            value={editingCommentBody()}
+                            onInput={(e) => setEditingCommentBody(e.currentTarget.value)}
+                          />
+                          <div class="comment-actions">
+                            <button type="button" class="btn btn-primary btn-sm" onClick={() => handleCommentEdit(comment.id)}>
+                              保存
+                            </button>
+                            <button type="button" class="btn btn-ghost btn-sm" onClick={() => setEditingCommentId(null)}>
+                              キャンセル
+                            </button>
+                          </div>
+                        </Show>
+                        <Show when={comment.author.id === currentUserId() && editingCommentId() !== comment.id}>
+                          <div class="comment-actions">
+                            <button
+                              type="button"
+                              class="btn btn-ghost btn-sm"
+                              onClick={() => {
+                                setEditingCommentId(comment.id);
+                                setEditingCommentBody(comment.body);
+                              }}
+                            >
+                              編集
+                            </button>
+                            <button type="button" class="btn btn-ghost btn-sm" onClick={() => handleCommentDelete(comment.id)}>
+                              削除
+                            </button>
+                          </div>
+                        </Show>
                       </li>
                     )}
                   </For>
                 </Show>
               </ul>
+              <form class="comment-form" onSubmit={handleCommentSubmit}>
+                <input
+                  name="body"
+                  placeholder="コメントを入力…"
+                  maxlength={500}
+                  value={commentBody()}
+                  onInput={(e) => setCommentBody(e.currentTarget.value)}
+                />
+                <button type="submit" class="btn btn-primary btn-sm">
+                  送信
+                </button>
+              </form>
+              <Show when={commentError()}>
+                <p class="form-error">{commentError()}</p>
+              </Show>
             </section>
 
             <Show when={actionError()}>
