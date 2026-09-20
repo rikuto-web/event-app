@@ -116,3 +116,11 @@ class EventMemberInviteRequest(BaseModel):
 
 class EventMemberRoleUpdateRequest(BaseModel):
     role: str = Field(pattern="^(editor|viewer)$")
+
+
+class EventCommentCreateRequest(BaseModel):
+    body: str = Field(min_length=1, max_length=500)
+
+
+class EventCommentUpdateRequest(BaseModel):
+    body: str = Field(min_length=1, max_length=500)

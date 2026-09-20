@@ -325,3 +325,30 @@ class EventRepository:
         self.db.delete(member)
         self.db.commit()
         return True
+
+    def create_comment(self, event_id: UUID, author_id: UUID, body: str) -> EventComment:
+        comment = EventComment(event_id=event_id, author_id=author_id, body=body)
+        self.db.add(comment)
+        self.db.commit()
+        self.db.refresh(comment)
+        return comment
+
+    def get_comment(self, comment_id: UUID) -> EventComment | None:
+        return self.db.get(EventComment, comment_id)
+
+    def update_comment(self, comment_id: UUID, body: str) -> EventComment | None:
+        comment = self.db.get(EventComment, comment_id)
+        if comment is None:
+            return None
+        comment.body = body
+        self.db.commit()
+        self.db.refresh(comment)
+        return comment
+
+    def delete_comment(self, comment_id: UUID) -> bool:
+        comment = self.db.get(EventComment, comment_id)
+        if comment is None:
+            return False
+        self.db.delete(comment)
+        self.db.commit()
+        return True
