@@ -33,6 +33,13 @@ class EventService:
     def _forbidden(self) -> AppError:
         return AppError(code="FORBIDDEN", message="権限がありません", status_code=403)
 
+    def _require_owner(self, user_id: UUID, event_id: UUID) -> None:
+        role = self.events.get_member_role(user_id, event_id)
+        if role is None:
+            raise self._event_not_found()
+        if role != "owner":
+            raise self._forbidden()
+
     def _require_editor(self, user_id: UUID, event_id: UUID) -> str:
         role = self.events.get_member_role(user_id, event_id)
         if role is None:
@@ -148,6 +155,11 @@ class EventService:
             },
         )
         return detail
+
+    async def delete_event(self, user_id: UUID, event_id: UUID) -> None:
+        self._require_owner(user_id, event_id)
+        if not self.events.delete_event(event_id):
+            raise self._event_not_found()
 
     def list_members(self, user_id: UUID, event_id: UUID) -> EventMembersResponse:
         if not self.events.is_member(user_id, event_id):
