@@ -70,6 +70,7 @@ class EventDetailResponse(BaseModel):
     starts_at: datetime
     ends_at: datetime
     location: str | None
+    image_url: str | None = None
     my_role: str
     my_participation: str | None = None
     participation_summary: ParticipationSummary

@@ -15,6 +15,7 @@ import {
   fetchEventComments,
   fetchEventDetail,
   updateEventComment,
+  updateEventParticipation,
   type EventCommentItem,
   fetchEventMembers,
   inviteEventMember,
@@ -28,7 +29,7 @@ export const EventDetailPage: Component = () => {
   const navigate = useNavigate();
   const eventId = () => params.eventId;
 
-  const [detail, { mutate: mutateDetail }] = createResource(eventId, fetchEventDetail);
+  const [detail, { mutate: mutateDetail, refetch: refetchDetail }] = createResource(eventId, fetchEventDetail);
   const [members, { mutate: mutateMembers }] = createResource(eventId, fetchEventMembers);
   const [comments, { mutate: mutateComments }] = createResource(eventId, fetchEventComments);
   const [wsConnected, setWsConnected] = createSignal(false);
@@ -59,6 +60,7 @@ export const EventDetailPage: Component = () => {
               ends_at: message.payload.ends_at ?? current.ends_at,
               location: message.payload.location ?? current.location,
               updated_at: message.payload.updated_at ?? current.updated_at,
+              image_url: message.payload.image_url ?? current.image_url,
             }
           : current,
       );
@@ -76,6 +78,20 @@ export const EventDetailPage: Component = () => {
         };
         return { items: [...current.items, item], total: current.total + 1 };
       });
+      return;
+    }
+    if (message.type === "participation.updated") {
+      refetchDetail();
+    }
+  };
+
+  const handleRsvp = async (status: "going" | "maybe" | "not_going") => {
+    setActionError("");
+    try {
+      const updated = await updateEventParticipation(eventId(), status);
+      mutateDetail(updated);
+    } catch (error) {
+      setActionError(error instanceof ApiError ? error.message : "参加表明に失敗しました");
     }
   };
 
@@ -248,6 +264,10 @@ export const EventDetailPage: Component = () => {
               <span>{wsConnected() ? "リアルタイム接続中" : "オフライン — 再接続中…"}</span>
             </div>
 
+            <Show when={event().image_url}>
+              <img class="hero-image" src={event().image_url!} alt="" />
+            </Show>
+
             <dl class="detail-meta">
               <div>
                 <dt>日時</dt>
@@ -267,6 +287,35 @@ export const EventDetailPage: Component = () => {
             </dl>
 
             <p class="detail-desc">{event().description || "（説明なし）"}</p>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h2>参加表明</h2>
+              </div>
+              <div class="rsvp-group">
+                <button
+                  type="button"
+                  class={`rsvp-btn ${event().my_participation === "going" ? "active-going" : ""}`}
+                  onClick={() => handleRsvp("going")}
+                >
+                  参加する
+                </button>
+                <button
+                  type="button"
+                  class={`rsvp-btn ${event().my_participation === "maybe" ? "active-maybe" : ""}`}
+                  onClick={() => handleRsvp("maybe")}
+                >
+                  未定
+                </button>
+                <button
+                  type="button"
+                  class={`rsvp-btn ${event().my_participation === "not_going" ? "active-not_going" : ""}`}
+                  onClick={() => handleRsvp("not_going")}
+                >
+                  不参加
+                </button>
+              </div>
+            </section>
 
             <section class="panel">
               <div class="panel-head">

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import AppError
 from app.repositories.event_repository import EventRepository
 from app.repositories.user_repository import UserRepository
+from app.services.storage_service import StorageService
 from app.schemas.event import (
     EventCommentAuthor,
     EventCommentCreateRequest,
@@ -33,12 +34,18 @@ class EventService:
         self.db = db
         self.events = EventRepository(db)
         self.users = UserRepository(db)
+        self.storage = StorageService()
 
     def _event_not_found(self) -> AppError:
         return AppError(code="NOT_FOUND", message="イベントが見つかりません", status_code=404)
 
     def _forbidden(self) -> AppError:
         return AppError(code="FORBIDDEN", message="権限がありません", status_code=403)
+
+    def _image_url(self, object_key: str | None) -> str | None:
+        if not object_key:
+            return None
+        return self.storage.build_public_url(object_key)
 
     def _require_owner(self, user_id: UUID, event_id: UUID) -> None:
         role = self.events.get_member_role(user_id, event_id)
@@ -125,6 +132,7 @@ class EventService:
             starts_at=row.event.starts_at,
             ends_at=row.event.ends_at,
             location=row.event.location,
+            image_url=self._image_url(row.event.image_object_key),
             my_role=row.my_role,
             my_participation=self.events.get_participation_status(event_id, user_id),
             participation_summary=ParticipationSummary(
@@ -160,14 +168,57 @@ class EventService:
                 "ends_at": detail.ends_at.isoformat(),
                 "location": detail.location,
                 "updated_at": detail.updated_at.isoformat() if detail.updated_at else None,
+                "image_url": detail.image_url,
+            },
+        )
+        return detail
+
+    async def upload_image(
+        self,
+        user_id: UUID,
+        event_id: UUID,
+        *,
+        content_type: str | None,
+        data: bytes,
+    ) -> EventDetailResponse:
+        self._require_editor(user_id, event_id)
+        event = self.events.get_event(event_id)
+        if event is None:
+            raise self._event_not_found()
+
+        old_key = event.image_object_key
+        object_key = self.storage.upload_image(event_id=event_id, content_type=content_type or "", data=data)
+        self.events.update_image_key(event_id, object_key)
+        if old_key and old_key != object_key:
+            self.storage.delete_object(old_key)
+
+        detail = self.get_event(user_id, event_id)
+        await self._broadcast(
+            event_id,
+            "event.updated",
+            {
+                "id": str(detail.id),
+                "title": detail.title,
+                "description": detail.description,
+                "starts_at": detail.starts_at.isoformat(),
+                "ends_at": detail.ends_at.isoformat(),
+                "location": detail.location,
+                "updated_at": detail.updated_at.isoformat() if detail.updated_at else None,
+                "image_url": detail.image_url,
             },
         )
         return detail
 
     async def delete_event(self, user_id: UUID, event_id: UUID) -> None:
         self._require_owner(user_id, event_id)
+        event = self.events.get_event(event_id)
+        if event is None:
+            raise self._event_not_found()
+        image_key = event.image_object_key
         if not self.events.delete_event(event_id):
             raise self._event_not_found()
+        if image_key:
+            self.storage.delete_object(image_key)
 
     async def invite_member(
         self, user_id: UUID, event_id: UUID, data: EventMemberInviteRequest

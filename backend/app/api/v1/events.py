@@ -2,7 +2,7 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user
@@ -62,6 +62,22 @@ def get_event(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> EventDetailResponse:
     return EventService(db).get_event(current_user.id, event_id)
+
+
+@router.post("/{event_id}/image", response_model=EventDetailResponse)
+async def upload_event_image(
+    event_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    file: UploadFile = File(...),
+) -> EventDetailResponse:
+    data = await file.read()
+    return await EventService(db).upload_image(
+        current_user.id,
+        event_id,
+        content_type=file.content_type,
+        data=data,
+    )
 
 
 @router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)

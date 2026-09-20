@@ -9,7 +9,7 @@ import {
   fromLocalDatetimeInput,
   toLocalDatetimeInput,
 } from "../lib/event-dates";
-import { canEditEvent, fetchEventDetail, updateEvent } from "../lib/events";
+import { canEditEvent, fetchEventDetail, updateEvent, uploadEventImage } from "../lib/events";
 import {
   validateDatetimeRequired,
   validateEventDatetimeRange,
@@ -31,6 +31,9 @@ export const EventEditPage: Component = () => {
   const [formError, setFormError] = createSignal("");
   const [isSubmitting, setIsSubmitting] = createSignal(false);
   const [submitted, setSubmitted] = createSignal(false);
+  const [imageFile, setImageFile] = createSignal<File | null>(null);
+  const [imagePreview, setImagePreview] = createSignal<string | null>(null);
+  const [imageWarning, setImageWarning] = createSignal("");
 
   const applyDetail = (event: NonNullable<ReturnType<typeof detail>>) => {
     if (initialized()) return;
@@ -39,6 +42,7 @@ export const EventEditPage: Component = () => {
     setStartsAt(toLocalDatetimeInput(event.starts_at));
     setEndsAt(toLocalDatetimeInput(event.ends_at));
     setLocation(event.location ?? "");
+    if (event.image_url) setImagePreview(event.image_url);
     setInitialized(true);
   };
 
@@ -53,9 +57,17 @@ export const EventEditPage: Component = () => {
     return null;
   });
 
+  const handleImageChange = (event: Event) => {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+    setImageFile(file);
+    setImagePreview(file ? URL.createObjectURL(file) : detail()?.image_url ?? null);
+  };
+
   const handleSubmit = async (event: Event) => {
     event.preventDefault();
     setFormError("");
+    setImageWarning("");
     setSubmitted(true);
 
     const titleMessage = validateEventTitle(title());
@@ -73,9 +85,26 @@ export const EventEditPage: Component = () => {
         ends_at: fromLocalDatetimeInput(endsAt()),
         location: location().trim() || undefined,
       });
+
+      const file = imageFile();
+      if (file) {
+        try {
+          await uploadEventImage(eventId(), file);
+        } catch (error) {
+          const base = "イベントは保存されましたが、画像のアップロードに失敗しました。";
+          setImageWarning(error instanceof ApiError ? `${base} ${error.message}` : base);
+          navigate(`/events/${eventId()}`);
+          return;
+        }
+      }
+
       navigate(`/events/${eventId()}`);
     } catch (error) {
-      setFormError(error instanceof ApiError ? error.message : "保存に失敗しました。時間をおいて再度お試しください。");
+      if (error instanceof ApiError) {
+        setFormError(error.message);
+      } else {
+        setFormError("保存に失敗しました。時間をおいて再度お試しください。");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -172,7 +201,18 @@ export const EventEditPage: Component = () => {
                   }}
                 />
 
+                <div class="auth-field">
+                  <label class="auth-label" for="edit-image">
+                    画像
+                  </label>
+                  <input id="edit-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageChange} />
+                  <Show when={imagePreview()}>
+                    {(src) => <img class="hero-image" src={src()} alt="" />}
+                  </Show>
+                </div>
+
                 <AuthFormAlert message={formError()} />
+                <AuthFormAlert message={imageWarning()} />
 
                 <div class="modal-actions">
                   <A href={`/events/${eventId()}`} class="btn btn-ghost btn-sm">

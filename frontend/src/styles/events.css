@@ -951,6 +951,45 @@
   margin-top: 0.35rem;
 }
 
+.rsvp-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.rsvp-btn {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.rsvp-btn.active-going {
+  border-color: var(--accent);
+  background: rgba(61, 214, 198, 0.12);
+}
+
+.rsvp-btn.active-maybe {
+  border-color: var(--warm);
+  background: rgba(255, 179, 71, 0.12);
+}
+
+.rsvp-btn.active-not_going {
+  border-color: var(--danger);
+  background: rgba(255, 107, 107, 0.12);
+}
+
+.hero-image {
+  width: 100%;
+  max-height: 280px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+}
+
 @media (max-width: 700px) {
   .calendar-day {
     min-height: 72px;
