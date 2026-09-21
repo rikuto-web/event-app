@@ -57,6 +57,15 @@ def get_event(
     return EventService(db).get_event(current_user.id, event_id)
 
 
+@router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_event(
+    event_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> None:
+    await EventService(db).delete_event(current_user.id, event_id)
+
+
 @router.put("/{event_id}", response_model=EventDetailResponse)
 async def update_event(
     event_id: UUID,

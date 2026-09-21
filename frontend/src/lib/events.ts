@@ -105,6 +105,10 @@ export async function fetchEventDetail(eventId: string): Promise<EventDetail> {
   return fetchJson<EventDetail>(`/events/${eventId}`);
 }
 
+export async function deleteEvent(eventId: string): Promise<void> {
+  return fetchJson<void>(`/events/${eventId}`, { method: "DELETE" });
+}
+
 export async function updateEvent(eventId: string, payload: UpdateEventPayload): Promise<EventDetail> {
   return fetchJson<EventDetail>(`/events/${eventId}`, {
     method: "PUT",

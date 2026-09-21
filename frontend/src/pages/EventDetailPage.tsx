@@ -1,5 +1,6 @@
-import { A, useParams } from "@solidjs/router";
+import { A, useNavigate, useParams } from "@solidjs/router";
 import { For, Show, createEffect, createResource, createSignal, type Component } from "solid-js";
+import { ApiError } from "../lib/api";
 import { formatEventDateRange } from "../lib/event-dates";
 import { connectEventWebSocket, type EventWsMessage } from "../lib/event-websocket";
 import {
@@ -7,18 +8,23 @@ import {
   canEditEvent,
   canInviteMembers,
   fetchEventComments,
+  deleteEvent,
   fetchEventDetail,
   fetchEventMembers,
 } from "../lib/events";
 
 export const EventDetailPage: Component = () => {
   const params = useParams<{ eventId: string }>();
+  const navigate = useNavigate();
   const eventId = () => params.eventId;
 
   const [detail, { mutate: mutateDetail }] = createResource(eventId, fetchEventDetail);
   const [members] = createResource(eventId, fetchEventMembers);
   const [comments] = createResource(eventId, fetchEventComments);
   const [wsConnected, setWsConnected] = createSignal(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
+  const [isDeleting, setIsDeleting] = createSignal(false);
+  const [actionError, setActionError] = createSignal("");
 
   const isLoading = () => detail.loading || members.loading || comments.loading;
   const loadError = () => detail.error ?? members.error ?? comments.error;
@@ -38,6 +44,20 @@ export const EventDetailPage: Component = () => {
           }
         : current,
     );
+  };
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    setActionError("");
+    try {
+      await deleteEvent(eventId());
+      navigate("/events", { replace: true });
+    } catch (error) {
+      setActionError(error instanceof ApiError ? error.message : "削除に失敗しました");
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
   };
 
   createEffect(() => {
@@ -75,7 +95,7 @@ export const EventDetailPage: Component = () => {
                   </A>
                 </Show>
                 <Show when={canDeleteEvent(event().my_role)}>
-                  <button type="button" class="btn btn-danger btn-sm" disabled>
+                  <button type="button" class="btn btn-danger btn-sm" onClick={() => setShowDeleteConfirm(true)}>
                     削除
                   </button>
                 </Show>
@@ -148,8 +168,29 @@ export const EventDetailPage: Component = () => {
                 </Show>
               </ul>
             </section>
+
+            <Show when={actionError()}>
+              <p class="form-error">{actionError()}</p>
+            </Show>
           </>
         )}
+      </Show>
+
+      <Show when={showDeleteConfirm()}>
+        <div class="modal-backdrop" role="dialog" aria-modal="true">
+          <div class="modal-panel">
+            <h2>イベントを削除しますか？</h2>
+            <p>この操作は取り消せません。</p>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-ghost btn-sm" onClick={() => setShowDeleteConfirm(false)}>
+                キャンセル
+              </button>
+              <button type="button" class="btn btn-danger btn-sm" disabled={isDeleting()} onClick={handleDelete}>
+                {isDeleting() ? "削除中..." : "削除する"}
+              </button>
+            </div>
+          </div>
+        </div>
       </Show>
     </section>
   );
