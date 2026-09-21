@@ -71,6 +71,7 @@ class EventDetailResponse(BaseModel):
     ends_at: datetime
     location: str | None
     my_role: str
+    my_participation: str | None = None
     participation_summary: ParticipationSummary
     updated_at: datetime | None = None
 
@@ -124,3 +125,7 @@ class EventCommentCreateRequest(BaseModel):
 
 class EventCommentUpdateRequest(BaseModel):
     body: str = Field(min_length=1, max_length=500)
+
+
+class EventParticipationUpdateRequest(BaseModel):
+    status: str = Field(pattern="^(going|maybe|not_going)$")

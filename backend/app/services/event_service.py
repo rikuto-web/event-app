@@ -16,6 +16,7 @@ from app.schemas.event import (
     EventDetailResponse,
     EventListItem,
     EventListResponse,
+    EventParticipationUpdateRequest,
     EventMemberInviteRequest,
     EventMemberItem,
     EventMemberRoleUpdateRequest,
@@ -125,6 +126,7 @@ class EventService:
             ends_at=row.event.ends_at,
             location=row.event.location,
             my_role=row.my_role,
+            my_participation=self.events.get_participation_status(event_id, user_id),
             participation_summary=ParticipationSummary(
                 going=row.going,
                 maybe=row.maybe,
@@ -328,3 +330,27 @@ class EventService:
 
         if not self.events.delete_comment(comment_id):
             raise self._event_not_found()
+
+    async def update_participation(
+        self,
+        user_id: UUID,
+        event_id: UUID,
+        data: EventParticipationUpdateRequest,
+    ) -> EventDetailResponse:
+        if not self.events.is_member(user_id, event_id):
+            raise self._event_not_found()
+
+        self.events.upsert_participation(event_id, user_id, data.status)
+        user = self.users.get_by_id(user_id)
+        assert user is not None
+        detail = self.get_event(user_id, event_id)
+        await self._broadcast(
+            event_id,
+            "participation.updated",
+            {
+                "user_id": str(user_id),
+                "display_name": user.display_name,
+                "status": data.status,
+            },
+        )
+        return detail

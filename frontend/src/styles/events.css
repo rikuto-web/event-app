@@ -935,6 +935,22 @@
   font-size: 0.82rem;
 }
 
+.comment-form {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.comment-form input {
+  flex: 1;
+}
+
+.comment-actions {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
 @media (max-width: 700px) {
   .calendar-day {
     min-height: 72px;

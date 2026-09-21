@@ -352,3 +352,25 @@ class EventRepository:
         self.db.delete(comment)
         self.db.commit()
         return True
+
+    def get_participation_status(self, event_id: UUID, user_id: UUID) -> str | None:
+        stmt = select(EventParticipation.status).where(
+            EventParticipation.event_id == event_id,
+            EventParticipation.user_id == user_id,
+        )
+        return self.db.execute(stmt).scalar_one_or_none()
+
+    def upsert_participation(self, event_id: UUID, user_id: UUID, status: str) -> EventParticipation:
+        stmt = select(EventParticipation).where(
+            EventParticipation.event_id == event_id,
+            EventParticipation.user_id == user_id,
+        )
+        participation = self.db.execute(stmt).scalar_one_or_none()
+        if participation is None:
+            participation = EventParticipation(event_id=event_id, user_id=user_id, status=status)
+            self.db.add(participation)
+        else:
+            participation.status = status
+        self.db.commit()
+        self.db.refresh(participation)
+        return participation

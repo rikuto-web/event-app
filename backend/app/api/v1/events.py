@@ -16,6 +16,7 @@ from app.schemas.event import (
     EventCreateRequest,
     EventDetailResponse,
     EventListResponse,
+    EventParticipationUpdateRequest,
     EventMemberInviteRequest,
     EventMemberItem,
     EventMemberRoleUpdateRequest,
@@ -151,6 +152,16 @@ async def delete_event_comment(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> None:
     await EventService(db).delete_comment(current_user.id, event_id, comment_id)
+
+
+@router.put("/{event_id}/participation", response_model=EventDetailResponse)
+async def update_event_participation(
+    event_id: UUID,
+    payload: EventParticipationUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> EventDetailResponse:
+    return await EventService(db).update_participation(current_user.id, event_id, payload)
 
 
 @router.get("/{event_id}/comments", response_model=EventCommentsResponse)
