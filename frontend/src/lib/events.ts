@@ -35,8 +35,11 @@ export type EventDetail = {
   starts_at: string;
   ends_at: string;
   location: string | null;
+  image_url?: string | null;
   my_role: "owner" | "editor" | "viewer";
+  my_participation?: "going" | "maybe" | "not_going" | null;
   participation_summary: ParticipationSummary;
+  updated_at?: string | null;
 };
 
 export type EventMemberUser = {
@@ -144,6 +147,42 @@ export async function updateEventComment(
 
 export async function deleteEventComment(eventId: string, commentId: string): Promise<void> {
   return fetchJson<void>(`/events/${eventId}/comments/${commentId}`, { method: "DELETE" });
+}
+
+export async function uploadEventImage(eventId: string, file: File): Promise<EventDetail> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const { getAccessToken } = await import("./auth");
+  const token = getAccessToken();
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8080/api/v1";
+  const response = await fetch(`${API_BASE_URL}/events/${eventId}/image`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+    credentials: "include",
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as
+      | { error?: { code?: string; message?: string } }
+      | null;
+    const { ApiError } = await import("./api");
+    throw new ApiError(
+      response.status,
+      body?.error?.code ?? "HTTP_ERROR",
+      body?.error?.message ?? `Request failed: ${response.status}`,
+    );
+  }
+  return (await response.json()) as EventDetail;
+}
+
+export async function updateEventParticipation(
+  eventId: string,
+  status: "going" | "maybe" | "not_going",
+): Promise<EventDetail> {
+  return fetchJson<EventDetail>(`/events/${eventId}/participation`, {
+    method: "PUT",
+    body: JSON.stringify({ status }),
+  });
 }
 
 export function canEditEvent(role: EventDetail["my_role"]): boolean {

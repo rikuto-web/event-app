@@ -13,6 +13,13 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
+    storage_backend: str = "filesystem"
+    storage_local_path: str = "/tmp/event-app-storage"
+    storage_public_url_base: str = "http://127.0.0.1:8080/storage"
+    s3_endpoint_url: str | None = None
+    s3_access_key: str | None = None
+    s3_secret_key: str | None = None
+    s3_bucket: str = "event-app-images"
 
 
 @lru_cache

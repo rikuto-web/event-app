@@ -374,3 +374,15 @@ class EventRepository:
         self.db.commit()
         self.db.refresh(participation)
         return participation
+
+    def get_event(self, event_id: UUID) -> Event | None:
+        return self.db.get(Event, event_id)
+
+    def update_image_key(self, event_id: UUID, object_key: str) -> Event | None:
+        event = self.db.get(Event, event_id)
+        if event is None:
+            return None
+        event.image_object_key = object_key
+        self.db.commit()
+        self.db.refresh(event)
+        return event

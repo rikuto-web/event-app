@@ -1,11 +1,13 @@
 import logging
 import uuid
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.v1.router import router as v1_router
@@ -32,6 +34,11 @@ def create_app() -> FastAPI:
     )
     app.include_router(v1_router, prefix="/api/v1")
     app.include_router(ws_router)
+
+    if settings.storage_backend == "filesystem":
+        storage_root = Path(settings.storage_local_path)
+        storage_root.mkdir(parents=True, exist_ok=True)
+        app.mount("/storage", StaticFiles(directory=storage_root), name="storage")
 
     @app.middleware("http")
     async def logging_middleware(
