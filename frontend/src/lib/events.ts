@@ -81,6 +81,8 @@ export type CreateEventPayload = {
   location?: string;
 };
 
+export type UpdateEventPayload = CreateEventPayload;
+
 export async function fetchEvents(params: EventListParams = {}): Promise<EventListResponse> {
   const search = new URLSearchParams();
   if (params.role) search.set("role", params.role);
@@ -101,6 +103,13 @@ export async function createEvent(payload: CreateEventPayload): Promise<EventDet
 
 export async function fetchEventDetail(eventId: string): Promise<EventDetail> {
   return fetchJson<EventDetail>(`/events/${eventId}`);
+}
+
+export async function updateEvent(eventId: string, payload: UpdateEventPayload): Promise<EventDetail> {
+  return fetchJson<EventDetail>(`/events/${eventId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function fetchEventMembers(eventId: string): Promise<EventMembersResponse> {

@@ -49,6 +49,20 @@ class EventCreateRequest(BaseModel):
         return self
 
 
+class EventUpdateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=100)
+    description: str | None = None
+    starts_at: datetime
+    ends_at: datetime
+    location: str | None = Field(default=None, max_length=200)
+
+    @model_validator(mode="after")
+    def validate_datetime_range(self) -> Self:
+        if self.ends_at < self.starts_at:
+            raise ValueError("ends_at must be on or after starts_at")
+        return self
+
+
 class EventDetailResponse(BaseModel):
     id: UUID
     title: str
@@ -58,6 +72,7 @@ class EventDetailResponse(BaseModel):
     location: str | None
     my_role: str
     participation_summary: ParticipationSummary
+    updated_at: datetime | None = None
 
 
 class EventMemberUser(BaseModel):

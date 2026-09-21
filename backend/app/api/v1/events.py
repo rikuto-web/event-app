@@ -14,6 +14,7 @@ from app.schemas.event import (
     EventDetailResponse,
     EventListResponse,
     EventMembersResponse,
+    EventUpdateRequest,
 )
 from app.services.event_service import EventService
 
@@ -54,6 +55,16 @@ def get_event(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> EventDetailResponse:
     return EventService(db).get_event(current_user.id, event_id)
+
+
+@router.put("/{event_id}", response_model=EventDetailResponse)
+async def update_event(
+    event_id: UUID,
+    payload: EventUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> EventDetailResponse:
+    return await EventService(db).update_event(current_user.id, event_id, payload)
 
 
 @router.get("/{event_id}/members", response_model=EventMembersResponse)
