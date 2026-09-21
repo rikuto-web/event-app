@@ -13,6 +13,9 @@ from app.schemas.event import (
     EventCreateRequest,
     EventDetailResponse,
     EventListResponse,
+    EventMemberInviteRequest,
+    EventMemberItem,
+    EventMemberRoleUpdateRequest,
     EventMembersResponse,
     EventUpdateRequest,
 )
@@ -74,6 +77,37 @@ async def update_event(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> EventDetailResponse:
     return await EventService(db).update_event(current_user.id, event_id, payload)
+
+
+@router.post("/{event_id}/members", response_model=EventMemberItem, status_code=status.HTTP_201_CREATED)
+async def invite_event_member(
+    event_id: UUID,
+    payload: EventMemberInviteRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> EventMemberItem:
+    return await EventService(db).invite_member(current_user.id, event_id, payload)
+
+
+@router.patch("/{event_id}/members/{user_id}", response_model=EventMemberItem)
+async def update_event_member_role(
+    event_id: UUID,
+    user_id: UUID,
+    payload: EventMemberRoleUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> EventMemberItem:
+    return await EventService(db).update_member_role(current_user.id, event_id, user_id, payload)
+
+
+@router.delete("/{event_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_event_member(
+    event_id: UUID,
+    user_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> None:
+    await EventService(db).remove_member(current_user.id, event_id, user_id)
 
 
 @router.get("/{event_id}/members", response_model=EventMembersResponse)

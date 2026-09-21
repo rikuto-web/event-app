@@ -135,3 +135,32 @@ export function canDeleteEvent(role: EventDetail["my_role"]): boolean {
 export function canInviteMembers(role: EventDetail["my_role"]): boolean {
   return role === "owner";
 }
+
+export function canManageMember(role: EventDetail["my_role"]): boolean {
+  return role === "owner";
+}
+
+export async function inviteEventMember(
+  eventId: string,
+  payload: { email: string; role: "editor" | "viewer" },
+): Promise<EventMemberItem> {
+  return fetchJson<EventMemberItem>(`/events/${eventId}/members`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateEventMemberRole(
+  eventId: string,
+  userId: string,
+  role: "editor" | "viewer",
+): Promise<EventMemberItem> {
+  return fetchJson<EventMemberItem>(`/events/${eventId}/members/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
+}
+
+export async function removeEventMember(eventId: string, userId: string): Promise<void> {
+  return fetchJson<void>(`/events/${eventId}/members/${userId}`, { method: "DELETE" });
+}

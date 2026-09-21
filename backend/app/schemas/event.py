@@ -107,3 +107,12 @@ class EventCommentItem(BaseModel):
 class EventCommentsResponse(BaseModel):
     items: list[EventCommentItem]
     total: int
+
+
+class EventMemberInviteRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    role: str = Field(pattern="^(editor|viewer)$")
+
+
+class EventMemberRoleUpdateRequest(BaseModel):
+    role: str = Field(pattern="^(editor|viewer)$")

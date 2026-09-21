@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppError
 from app.repositories.event_repository import EventRepository
+from app.repositories.user_repository import UserRepository
 from app.schemas.event import (
     EventCommentAuthor,
     EventCommentItem,
@@ -13,7 +14,9 @@ from app.schemas.event import (
     EventDetailResponse,
     EventListItem,
     EventListResponse,
+    EventMemberInviteRequest,
     EventMemberItem,
+    EventMemberRoleUpdateRequest,
     EventMemberUser,
     EventMembersResponse,
     EventUpdateRequest,
@@ -26,6 +29,7 @@ class EventService:
     def __init__(self, db: Session) -> None:
         self.db = db
         self.events = EventRepository(db)
+        self.users = UserRepository(db)
 
     def _event_not_found(self) -> AppError:
         return AppError(code="NOT_FOUND", message="イベントが見つかりません", status_code=404)
@@ -159,6 +163,66 @@ class EventService:
     async def delete_event(self, user_id: UUID, event_id: UUID) -> None:
         self._require_owner(user_id, event_id)
         if not self.events.delete_event(event_id):
+            raise self._event_not_found()
+
+    async def invite_member(
+        self, user_id: UUID, event_id: UUID, data: EventMemberInviteRequest
+    ) -> EventMemberItem:
+        self._require_owner(user_id, event_id)
+        invitee = self.users.get_by_email(data.email)
+        if invitee is None:
+            raise AppError(code="CONFLICT", message="ユーザーが見つかりません", status_code=409)
+        if self.events.member_exists(event_id, invitee.id):
+            raise AppError(code="CONFLICT", message="既にメンバーです", status_code=409)
+
+        self.events.add_member(event_id, invitee.id, data.role)
+        return EventMemberItem(
+            user_id=invitee.id,
+            role=data.role,
+            user=EventMemberUser(
+                id=invitee.id,
+                email=invitee.email,
+                display_name=invitee.display_name,
+            ),
+        )
+
+    async def update_member_role(
+        self,
+        user_id: UUID,
+        event_id: UUID,
+        target_user_id: UUID,
+        data: EventMemberRoleUpdateRequest,
+    ) -> EventMemberItem:
+        self._require_owner(user_id, event_id)
+        target_role = self.events.get_member_role(target_user_id, event_id)
+        if target_role is None:
+            raise self._event_not_found()
+        if target_role == "owner":
+            raise self._forbidden()
+
+        if not self.events.update_member_role(event_id, target_user_id, data.role):
+            raise self._event_not_found()
+
+        target = self.users.get_by_id(target_user_id)
+        assert target is not None
+        return EventMemberItem(
+            user_id=target.id,
+            role=data.role,
+            user=EventMemberUser(
+                id=target.id,
+                email=target.email,
+                display_name=target.display_name,
+            ),
+        )
+
+    async def remove_member(self, user_id: UUID, event_id: UUID, target_user_id: UUID) -> None:
+        self._require_owner(user_id, event_id)
+        target_role = self.events.get_member_role(target_user_id, event_id)
+        if target_role is None:
+            raise self._event_not_found()
+        if target_role == "owner":
+            raise self._forbidden()
+        if not self.events.remove_member(event_id, target_user_id):
             raise self._event_not_found()
 
     def list_members(self, user_id: UUID, event_id: UUID) -> EventMembersResponse:

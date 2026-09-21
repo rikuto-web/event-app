@@ -279,3 +279,49 @@ class EventRepository:
         self.db.commit()
         self.db.refresh(event)
         return event
+
+    def delete_event(self, event_id: UUID) -> bool:
+        event = self.db.get(Event, event_id)
+        if event is None:
+            return False
+        self.db.delete(event)
+        self.db.commit()
+        return True
+
+    def add_member(self, event_id: UUID, user_id: UUID, role: str) -> EventMember:
+        member = EventMember(event_id=event_id, user_id=user_id, role=role)
+        self.db.add(member)
+        self.db.commit()
+        self.db.refresh(member)
+        return member
+
+    def member_exists(self, event_id: UUID, user_id: UUID) -> bool:
+        stmt = select(EventMember.id).where(
+            EventMember.event_id == event_id,
+            EventMember.user_id == user_id,
+        )
+        return self.db.execute(stmt).scalar_one_or_none() is not None
+
+    def update_member_role(self, event_id: UUID, user_id: UUID, role: str) -> bool:
+        stmt = select(EventMember).where(
+            EventMember.event_id == event_id,
+            EventMember.user_id == user_id,
+        )
+        member = self.db.execute(stmt).scalar_one_or_none()
+        if member is None:
+            return False
+        member.role = role
+        self.db.commit()
+        return True
+
+    def remove_member(self, event_id: UUID, user_id: UUID) -> bool:
+        stmt = select(EventMember).where(
+            EventMember.event_id == event_id,
+            EventMember.user_id == user_id,
+        )
+        member = self.db.execute(stmt).scalar_one_or_none()
+        if member is None:
+            return False
+        self.db.delete(member)
+        self.db.commit()
+        return True
