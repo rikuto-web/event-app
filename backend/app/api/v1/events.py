@@ -9,7 +9,10 @@ from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models import User
 from app.schemas.event import (
+    EventCommentCreateRequest,
+    EventCommentItem,
     EventCommentsResponse,
+    EventCommentUpdateRequest,
     EventCreateRequest,
     EventDetailResponse,
     EventListResponse,
@@ -117,6 +120,37 @@ def list_event_members(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> EventMembersResponse:
     return EventService(db).list_members(current_user.id, event_id)
+
+
+@router.post("/{event_id}/comments", response_model=EventCommentItem, status_code=status.HTTP_201_CREATED)
+async def create_event_comment(
+    event_id: UUID,
+    payload: EventCommentCreateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> EventCommentItem:
+    return await EventService(db).create_comment(current_user.id, event_id, payload)
+
+
+@router.patch("/{event_id}/comments/{comment_id}", response_model=EventCommentItem)
+async def update_event_comment(
+    event_id: UUID,
+    comment_id: UUID,
+    payload: EventCommentUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> EventCommentItem:
+    return await EventService(db).update_comment(current_user.id, event_id, comment_id, payload)
+
+
+@router.delete("/{event_id}/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_event_comment(
+    event_id: UUID,
+    comment_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> None:
+    await EventService(db).delete_comment(current_user.id, event_id, comment_id)
 
 
 @router.get("/{event_id}/comments", response_model=EventCommentsResponse)

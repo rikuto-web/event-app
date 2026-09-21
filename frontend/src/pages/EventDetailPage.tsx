@@ -7,10 +7,15 @@ import {
   canDeleteEvent,
   canEditEvent,
   canInviteMembers,
-  fetchEventComments,
+  canManageMember,
   deleteEvent,
+  fetchEventComments,
   fetchEventDetail,
   fetchEventMembers,
+  inviteEventMember,
+  removeEventMember,
+  updateEventMemberRole,
+  type EventMemberItem,
 } from "../lib/events";
 
 export const EventDetailPage: Component = () => {
@@ -19,12 +24,16 @@ export const EventDetailPage: Component = () => {
   const eventId = () => params.eventId;
 
   const [detail, { mutate: mutateDetail }] = createResource(eventId, fetchEventDetail);
-  const [members] = createResource(eventId, fetchEventMembers);
+  const [members, { mutate: mutateMembers }] = createResource(eventId, fetchEventMembers);
   const [comments] = createResource(eventId, fetchEventComments);
   const [wsConnected, setWsConnected] = createSignal(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
   const [isDeleting, setIsDeleting] = createSignal(false);
   const [actionError, setActionError] = createSignal("");
+  const [showInvite, setShowInvite] = createSignal(false);
+  const [inviteEmail, setInviteEmail] = createSignal("");
+  const [inviteRole, setInviteRole] = createSignal<"editor" | "viewer">("editor");
+  const [inviteError, setInviteError] = createSignal("");
 
   const isLoading = () => detail.loading || members.loading || comments.loading;
   const loadError = () => detail.error ?? members.error ?? comments.error;
@@ -44,6 +53,56 @@ export const EventDetailPage: Component = () => {
           }
         : current,
     );
+  };
+
+  const handleInvite = async (event: Event) => {
+    event.preventDefault();
+    setInviteError("");
+    try {
+      const member = await inviteEventMember(eventId(), {
+        email: inviteEmail().trim(),
+        role: inviteRole(),
+      });
+      mutateMembers((current) =>
+        current ? { items: [...current.items, member], total: current.total + 1 } : current,
+      );
+      setShowInvite(false);
+      setInviteEmail("");
+    } catch (error) {
+      setInviteError(error instanceof ApiError ? error.message : "招待に失敗しました");
+    }
+  };
+
+  const handleMemberRoleChange = async (member: EventMemberItem, role: "editor" | "viewer") => {
+    try {
+      const updated = await updateEventMemberRole(eventId(), member.user_id, role);
+      mutateMembers((current) =>
+        current
+          ? {
+              items: current.items.map((item) => (item.user_id === member.user_id ? updated : item)),
+              total: current.total,
+            }
+          : current,
+      );
+    } catch (error) {
+      setActionError(error instanceof ApiError ? error.message : "ロール変更に失敗しました");
+    }
+  };
+
+  const handleMemberRemove = async (member: EventMemberItem) => {
+    try {
+      await removeEventMember(eventId(), member.user_id);
+      mutateMembers((current) =>
+        current
+          ? {
+              items: current.items.filter((item) => item.user_id !== member.user_id),
+              total: Math.max(0, current.total - 1),
+            }
+          : current,
+      );
+    } catch (error) {
+      setActionError(error instanceof ApiError ? error.message : "除外に失敗しました");
+    }
   };
 
   const handleDelete = async () => {
@@ -131,7 +190,7 @@ export const EventDetailPage: Component = () => {
               <div class="panel-head">
                 <h2>メンバー ({members()?.total ?? 0})</h2>
                 <Show when={canInviteMembers(event().my_role)}>
-                  <button type="button" class="btn btn-ghost btn-sm" disabled>
+                  <button type="button" class="btn btn-ghost btn-sm" onClick={() => setShowInvite(true)}>
                     + 招待
                   </button>
                 </Show>
@@ -139,9 +198,28 @@ export const EventDetailPage: Component = () => {
               <ul class="member-list">
                 <For each={members()?.items ?? []}>
                   {(member) => (
-                    <li>
+                    <li class="member-row">
                       <span>{member.user.display_name}</span>
-                      <span class={`role-pill role-${member.role}`}>{member.role}</span>
+                      <Show
+                        when={canManageMember(event().my_role) && member.role !== "owner"}
+                        fallback={<span class={`role-pill role-${member.role}`}>{member.role}</span>}
+                      >
+                        <div class="member-actions">
+                          <select
+                            class="role-select"
+                            value={member.role}
+                            onChange={(e) =>
+                              handleMemberRoleChange(member, e.currentTarget.value as "editor" | "viewer")
+                            }
+                          >
+                            <option value="editor">editor</option>
+                            <option value="viewer">viewer</option>
+                          </select>
+                          <button type="button" class="btn btn-ghost btn-sm" onClick={() => handleMemberRemove(member)}>
+                            除外
+                          </button>
+                        </div>
+                      </Show>
                     </li>
                   )}
                 </For>
@@ -174,6 +252,50 @@ export const EventDetailPage: Component = () => {
             </Show>
           </>
         )}
+      </Show>
+
+      <Show when={showInvite()}>
+        <div class="modal-backdrop" role="dialog" aria-modal="true">
+          <div class="modal-panel">
+            <h2>メンバーを招待</h2>
+            <form onSubmit={handleInvite}>
+              <label class="auth-label" for="invite-email">
+                メールアドレス
+              </label>
+              <input
+                id="invite-email"
+                class="auth-input"
+                type="email"
+                required
+                value={inviteEmail()}
+                onInput={(e) => setInviteEmail(e.currentTarget.value)}
+              />
+              <label class="auth-label" for="invite-role">
+                ロール
+              </label>
+              <select
+                id="invite-role"
+                class="auth-input"
+                value={inviteRole()}
+                onChange={(e) => setInviteRole(e.currentTarget.value as "editor" | "viewer")}
+              >
+                <option value="editor">editor</option>
+                <option value="viewer">viewer</option>
+              </select>
+              <Show when={inviteError()}>
+                <p class="form-error">{inviteError()}</p>
+              </Show>
+              <div class="modal-actions">
+                <button type="button" class="btn btn-ghost btn-sm" onClick={() => setShowInvite(false)}>
+                  キャンセル
+                </button>
+                <button type="submit" class="btn btn-primary btn-sm">
+                  招待
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       </Show>
 
       <Show when={showDeleteConfirm()}>

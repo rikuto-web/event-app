@@ -8,8 +8,10 @@ from app.repositories.event_repository import EventRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.event import (
     EventCommentAuthor,
+    EventCommentCreateRequest,
     EventCommentItem,
     EventCommentsResponse,
+    EventCommentUpdateRequest,
     EventCreateRequest,
     EventDetailResponse,
     EventListItem,
@@ -259,3 +261,70 @@ class EventService:
             for row in rows
         ]
         return EventCommentsResponse(items=items, total=len(items))
+
+    async def create_comment(
+        self, user_id: UUID, event_id: UUID, data: EventCommentCreateRequest
+    ) -> EventCommentItem:
+        if not self.events.is_member(user_id, event_id):
+            raise self._event_not_found()
+
+        comment = self.events.create_comment(event_id, user_id, data.body)
+        author = self.users.get_by_id(user_id)
+        assert author is not None
+        item = EventCommentItem(
+            id=comment.id,
+            body=comment.body,
+            author=EventCommentAuthor(id=author.id, display_name=author.display_name),
+            created_at=comment.created_at,
+        )
+        await self._broadcast(
+            event_id,
+            "comment.created",
+            {
+                "id": str(item.id),
+                "body": item.body,
+                "author": {"id": str(item.author.id), "display_name": item.author.display_name},
+                "created_at": item.created_at.isoformat(),
+            },
+        )
+        return item
+
+    async def update_comment(
+        self,
+        user_id: UUID,
+        event_id: UUID,
+        comment_id: UUID,
+        data: EventCommentUpdateRequest,
+    ) -> EventCommentItem:
+        if not self.events.is_member(user_id, event_id):
+            raise self._event_not_found()
+
+        comment = self.events.get_comment(comment_id)
+        if comment is None or comment.event_id != event_id:
+            raise self._event_not_found()
+        if comment.author_id != user_id:
+            raise self._forbidden()
+
+        updated = self.events.update_comment(comment_id, data.body)
+        assert updated is not None
+        author = self.users.get_by_id(user_id)
+        assert author is not None
+        return EventCommentItem(
+            id=updated.id,
+            body=updated.body,
+            author=EventCommentAuthor(id=author.id, display_name=author.display_name),
+            created_at=updated.created_at,
+        )
+
+    async def delete_comment(self, user_id: UUID, event_id: UUID, comment_id: UUID) -> None:
+        if not self.events.is_member(user_id, event_id):
+            raise self._event_not_found()
+
+        comment = self.events.get_comment(comment_id)
+        if comment is None or comment.event_id != event_id:
+            raise self._event_not_found()
+        if comment.author_id != user_id:
+            raise self._forbidden()
+
+        if not self.events.delete_comment(comment_id):
+            raise self._event_not_found()

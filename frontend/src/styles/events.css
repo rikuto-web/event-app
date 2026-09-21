@@ -914,6 +914,27 @@
   margin-top: 0.5rem;
 }
 
+.member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.member-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.role-select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.82rem;
+}
+
 @media (max-width: 700px) {
   .calendar-day {
     min-height: 72px;
